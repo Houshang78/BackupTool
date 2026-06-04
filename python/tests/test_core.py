@@ -38,6 +38,19 @@ class TestCore(unittest.TestCase):
         self.assertIn("a.txt", restored)
         self.assertIn("b.txt", restored)
 
+    def test_empty_dir_roundtrip(self):
+        os.makedirs(os.path.join(self.src, "empty"))
+        core.backup([self.src], self.dst, setname="t", log=_silent)
+        out = os.path.join(self.tmp, "out")
+        core.restore(self.dst, setname="t", target=out, log=_silent)
+        restored_rel = self.src.lstrip("/") + "/empty"
+        self.assertTrue(os.path.isdir(os.path.join(out, restored_rel)))
+
+    def test_dir_not_counted_as_file(self):
+        # Adding/removing files must not let directories inflate file stats.
+        res = core.backup([self.src], self.dst, setname="t", log=_silent)
+        self.assertEqual(res["copied"], 2)  # a.txt + sub/b.txt only, no dirs
+
     def test_incremental_skips_unchanged(self):
         core.backup([self.src], self.dst, setname="t", log=_silent)
         res = core.backup([self.src], self.dst, setname="t", log=_silent)

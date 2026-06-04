@@ -72,6 +72,7 @@ where
 /// Apply all translated label texts for the given language code.
 fn apply_language(ui: &MainWindow, i18n: &I18n, code: &str) {
     let t = |k: &str| i18n.tr(code, k);
+    ui.set_rtl(i18n.is_rtl(code));
     ui.set_win_title(format!("backuptool — {}", i18n.name_of(code)).into());
     ui.set_t_language(t("language").into());
     // backup tab
@@ -264,6 +265,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if needs_pw && pass.is_empty() { ui.set_status(tr("need_password").into()); return; }
 
             let target = { let t = ui.get_r_target().to_string(); if t.is_empty() { "/".to_string() } else { t } };
+            // Restoring onto "/" overwrites the live system — confirm first (parity
+            // with the Python GUI). Skipped for dry runs, which write nothing.
+            if target == "/" && !ui.get_r_dry() {
+                let answer = rfd::MessageDialog::new()
+                    .set_level(rfd::MessageLevel::Warning)
+                    .set_title(tr("warning"))
+                    .set_description(tr("confirm_root"))
+                    .set_buttons(rfd::MessageButtons::YesNo)
+                    .show();
+                if answer != rfd::MessageDialogResult::Yes {
+                    ui.set_status(tr("ready").into());
+                    return;
+                }
+            }
             let ropt = RestoreOptions {
                 backup_dir: folder,
                 set: Some(setname),

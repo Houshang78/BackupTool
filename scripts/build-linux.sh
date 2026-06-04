@@ -10,6 +10,23 @@ mkdir -p "$OUT"
 
 echo "==> Rust (CLI + GUI, release)"
 cd "$ROOT/rust"
+
+# rustup installs cargo under ~/.cargo/bin, which sudo drops from PATH
+# (secure_path). Locate it so the script also works under sudo.
+if ! command -v cargo >/dev/null 2>&1; then
+  for env_file in "$HOME/.cargo/env" "/root/.cargo/env" \
+                  ${SUDO_USER:+"/home/$SUDO_USER/.cargo/env"}; do
+    [ -f "$env_file" ] && . "$env_file" && break
+  done
+fi
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "!! cargo not found." >&2
+  echo "   Install Rust (https://rustup.rs):  curl https://sh.rustup.rs -sSf | sh" >&2
+  echo "   Building needs no root — prefer:  bash scripts/build-linux.sh  (no sudo)." >&2
+  echo "   If you must use sudo:  sudo env \"PATH=\$PATH\" bash scripts/build-linux.sh" >&2
+  exit 1
+fi
+
 if ! cargo build --release --bin backuptool; then
   echo "!! cargo build failed." >&2
   echo "   If the error mentions 'lock file version 4', your Cargo is older than 1.78." >&2

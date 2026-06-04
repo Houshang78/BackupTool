@@ -49,7 +49,7 @@ which builds the same artifacts on GitHub-hosted runners.
 Pushing a tag builds and publishes binaries/installers for Linux, macOS and Windows
 (Rust CLI + GUI archives, plus `.deb` / `.pkg` / `.exe`) via GitHub Actions:
 ```bash
-git tag v1.1.0 && git push origin v1.1.0
+git tag v1.2.0 && git push origin v1.2.0
 ```
 
 ## Which one should I use?

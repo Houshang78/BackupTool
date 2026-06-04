@@ -74,7 +74,7 @@ pip install .                                   # dev install: backuptool, backu
 ### Native packages
 ```bash
 cd python
-bash packaging/build-deb.sh                     # Linux  -> dist/backuptool_1.1.0_all.deb
+bash packaging/build-deb.sh                     # Linux  -> dist/backuptool_1.2.0_all.deb
 bash packaging/build-macos.sh                   # macOS  -> dist/backuptool.app + .pkg
 powershell -File packaging\build-windows.ps1    # Windows -> dist\backuptool.exe (PyInstaller)
 ```

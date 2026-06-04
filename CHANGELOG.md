@@ -2,6 +2,33 @@
 
 All notable changes to this project. Versions follow [Semantic Versioning](https://semver.org).
 
+## [1.2.0]
+### Added
+- **Directory tracking** (both implementations): directories are now recorded in
+  the manifest (new `dir` entry type), so **empty directories survive** a
+  backup/restore round-trip and directory **permissions/owner/mtime are
+  reapplied** on restore (deepest-first, so child writes can't clobber a dir's
+  mtime). The manifest format stays cross-compatible between Python and Rust.
+- **Streamed encryption** (Rust): files are now encrypted/decrypted **chunk by
+  chunk** (1 MiB chunks) instead of being held whole in memory, so very large
+  files no longer risk OOM. Each chunk binds its index and a final-chunk flag as
+  AEAD associated data (reorder/truncation detection). Older whole-file encrypted
+  backups remain restorable (format auto-detected via a magic header).
+- **Restore-to-`/` confirmation** in the Rust (Slint) GUI, matching the Python
+  GUI (skipped for dry runs).
+
+### Fixed
+- Rust GUI now right-aligns free text for **RTL languages** (Persian); Slint has
+  no runtime widget mirroring, so full layout mirroring is still unavailable.
+- Python default exclude `lost+found` never matched (missing `*/` prefix); added.
+- Rust `scan` now **de-duplicates overlapping sources** (e.g. `/home` and
+  `/home/user`), avoiding double copy work and concurrent writes to one path.
+- **Path-traversal guard** on restore: manifest entries that are absolute or
+  contain `..` are skipped instead of being written outside the target.
+- `list` no longer counts directories in the per-set **FILES** column.
+- Python manifest history no longer overwrites a prior copy when two runs land in
+  the same second.
+
 ## [1.1.0]
 ### Added
 - **System-directory backup**: curated system dirs (`/etc`, `/usr/local/etc`, `/opt`,

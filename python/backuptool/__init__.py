@@ -3,4 +3,4 @@
 
 Works on Linux and macOS (standard library only, plus PySide6 for the GUI).
 """
-__version__ = "1.1.0"
+__version__ = "1.2.0"

@@ -12,6 +12,9 @@ export component MainWindow inherits Window {
     in property <string> status;
     in property <string> logtext;
     in property <bool> running;
+    // Right-to-left languages (e.g. Persian): Slint has no runtime widget
+    // mirroring, so we at least right-align the free-flowing text.
+    in property <bool> rtl;
 
     // --- language ---
     in property <string> win-title: "backuptool";
@@ -183,11 +186,11 @@ export component MainWindow inherits Window {
                 border-radius: 4px;
             }
         }
-        Text { text: root.status; }
+        Text { text: root.status; horizontal-alignment: root.rtl ? right : left; }
 
         ScrollView {
             min-height: 160px;
-            Text { text: root.logtext; wrap: word-wrap; }
+            Text { text: root.logtext; wrap: word-wrap; horizontal-alignment: root.rtl ? right : left; }
         }
     }
 }

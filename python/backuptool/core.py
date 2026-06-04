@@ -23,10 +23,11 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_compl
 MANIFEST_NAME = ".backuptool-manifest.json"
 HISTORY_DIR = ".backuptool-history"
 
-# File kinds. Kept as the JSON strings "file"/"symlink" so the manifest stays
-# compatible with the Rust implementation.
+# File kinds. Kept as the JSON strings "file"/"symlink"/"dir" so the manifest
+# stays compatible with the Rust implementation.
 KIND_FILE = "file"
 KIND_SYMLINK = "symlink"
+KIND_DIR = "dir"
 
 # Default excludes (cache / trash / temporary)
 DEFAULT_EXCLUDES = [
@@ -35,7 +36,7 @@ DEFAULT_EXCLUDES = [
     "*/.thumbnails/*", "*/.thumbnails",
     "*/Cache/*", "*/Cache",
     "*/cache2/*",
-    "*/.gvfs", "*.sock", "lost+found",
+    "*/.gvfs", "*.sock", "*/lost+found", "lost+found",
     "*/.Spotlight-V100/*", "*/.Trashes/*", "*/.fseventsd/*",
 ]
 
@@ -109,6 +110,8 @@ def _add_entry(entries: dict, full: str, excludes) -> None:
             meta["target"] = ""
     elif stat.S_ISREG(mode):
         meta["type"] = KIND_FILE
+    elif stat.S_ISDIR(mode):
+        meta["type"] = KIND_DIR  # recorded so empty dirs and dir metadata survive
     else:
         return  # skip sockets/FIFOs/devices
     rel = full.lstrip("/")
@@ -127,6 +130,7 @@ def scan(sources, excludes) -> dict:
         for root, dirs, files in os.walk(src, followlinks=False):
             dirs[:] = [d for d in dirs
                        if not is_excluded(os.path.join(root, d), excludes)]
+            _add_entry(entries, root, excludes)  # the directory itself (empty dirs too)
             for name in files:
                 _add_entry(entries, os.path.join(root, name), excludes)
     return entries
@@ -154,7 +158,12 @@ def save_manifest(manifest_path: str, man: dict, set_root: str) -> None:
     try:
         os.makedirs(hist, exist_ok=True)
         stamp = man["created"].replace(":", "").replace("-", "").replace("T", "-")
-        shutil.copy2(manifest_path, os.path.join(hist, f"manifest-{stamp}.json"))
+        dest = os.path.join(hist, f"manifest-{stamp}.json")
+        n = 1
+        while os.path.exists(dest):  # two runs in the same second must not overwrite
+            dest = os.path.join(hist, f"manifest-{stamp}-{n}.json")
+            n += 1
+        shutil.copy2(manifest_path, dest)
     except OSError:
         pass
 
@@ -171,7 +180,8 @@ def list_sets(backup_dir: str):
                     "set": name,
                     "host": man.get("host", "?"),
                     "created": man.get("created", "?"),
-                    "files": len(man.get("files", {})),
+                    "files": sum(1 for v in man.get("files", {}).values()
+                                 if v.get("type") != KIND_DIR),
                 })
     except OSError:
         pass
@@ -199,6 +209,9 @@ def needs_copy(meta: dict, prev: dict, use_checksum: bool) -> bool:
 # ----------------------------------------------------------------------------
 def copy_one(meta: dict, set_root: str, rel: str):
     dst = os.path.join(set_root, rel)
+    if meta["type"] == KIND_DIR:
+        os.makedirs(dst, exist_ok=True)
+        return 0
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     if meta["type"] == KIND_SYMLINK:
         try:
@@ -235,11 +248,13 @@ def backup(sources, dest, setname=None, workers=None, use_checksum=False,
 
     log("Scanning sources ...")
     entries = scan(sources, excludes)
-    log(f"{len(entries)} files found.")
+    dir_rels = [r for r, m in entries.items() if m["type"] == KIND_DIR]
+    file_entries = {r: m for r, m in entries.items() if m["type"] != KIND_DIR}
+    log(f"{len(file_entries)} files, {len(dir_rels)} dirs found.")
 
-    if use_checksum and entries:
+    if use_checksum and file_entries:
         log(f"Computing SHA-256 with {workers} processes (multicore) ...")
-        rels = list(entries.keys())
+        rels = list(file_entries.keys())
         paths = [entries[r]["path"] for r in rels]
         try:
             with ProcessPoolExecutor(max_workers=workers) as ex:
@@ -250,10 +265,12 @@ def backup(sources, dest, setname=None, workers=None, use_checksum=False,
             for rel in rels:
                 entries[rel]["sha256"] = sha256_file(entries[rel]["path"])
 
-    todo = [r for r, m in entries.items()
+    # Directories are tracked separately: they are always (re)created so empty
+    # dirs survive, but never counted as changed/unchanged/copied bytes.
+    todo = [r for r, m in file_entries.items()
             if needs_copy(m, prev_files.get(r), use_checksum)]
-    unchanged = len(entries) - len(todo)
-    total_bytes = sum(entries[r]["size"] for r in todo if entries[r]["type"] == KIND_FILE)
+    unchanged = len(file_entries) - len(todo)
+    total_bytes = sum(file_entries[r]["size"] for r in todo if file_entries[r]["type"] == KIND_FILE)
     deletions = [r for r in prev_files if r not in entries]
     log(f"Changed/new: {len(todo)} ({human(total_bytes)}) | unchanged: {unchanged} "
         f"| deleted in source: {len(deletions)}")
@@ -267,6 +284,13 @@ def backup(sources, dest, setname=None, workers=None, use_checksum=False,
         return {"copied": 0, "skipped": unchanged, "bytes": 0, "dryrun": True}
 
     os.makedirs(set_root, exist_ok=True)
+    # Recreate every source directory (shallow first) so empty dirs are preserved.
+    for r in sorted(dir_rels):
+        try:
+            os.makedirs(os.path.join(set_root, r), exist_ok=True)
+        except OSError:
+            pass
+
     done = copied = errors = 0
     copied_bytes = 0
     total = len(todo)
@@ -287,11 +311,22 @@ def backup(sources, dest, setname=None, workers=None, use_checksum=False,
 
     deleted = 0
     if prune:
-        for r in deletions:
+        # Remove vanished files first, then now-empty dirs (deepest first).
+        del_dirs = [r for r in deletions if prev_files.get(r, {}).get("type") == KIND_DIR]
+        del_files = [r for r in deletions if prev_files.get(r, {}).get("type") != KIND_DIR]
+        for r in del_files:
             tgt = os.path.join(set_root, r)
             try:
                 if os.path.lexists(tgt):
                     os.remove(tgt)
+                    deleted += 1
+            except OSError:
+                pass
+        for r in sorted(del_dirs, reverse=True):
+            tgt = os.path.join(set_root, r)
+            try:
+                if os.path.isdir(tgt):
+                    os.rmdir(tgt)
                     deleted += 1
             except OSError:
                 pass
@@ -342,6 +377,15 @@ def _am_root() -> bool:
     return hasattr(os, "geteuid") and os.geteuid() == 0
 
 
+def _is_safe_rel(rel: str) -> bool:
+    """Reject manifest paths that would escape the restore target (absolute
+    paths or any '..' component). Manifests written by scan() are always safe;
+    this guards against a tampered or hand-edited manifest."""
+    if not rel or os.path.isabs(rel):
+        return False
+    return ".." not in rel.replace("\\", "/").split("/")
+
+
 def restore(backup_dir, setname=None, target="/", workers=None,
             reapply_meta=True, dry_run=False, log=print, progress=None):
     if setname:
@@ -356,15 +400,43 @@ def restore(backup_dir, setname=None, target="/", workers=None,
     files = man.get("files", {})
     target = os.path.abspath(target)
     workers = workers or default_workers()
-    items = list(files.items())
-    total = len(items)
+    for r in files:
+        if not _is_safe_rel(r):
+            log(f"  SKIP unsafe path in manifest: {r}")
+    dir_items = [(r, m) for r, m in files.items()
+                 if m.get("type") == KIND_DIR and _is_safe_rel(r)]
+    file_items = [(r, m) for r, m in files.items()
+                  if m.get("type") != KIND_DIR and _is_safe_rel(r)]
+    total = len(file_items)
     am_root = _am_root()
-    log(f"Restoring {total} entries -> {target}")
+    log(f"Restoring {len(file_items)} files, {len(dir_items)} dirs -> {target}")
 
     if dry_run:
-        for rel, _ in items[:1000]:
+        for rel, _ in (dir_items + file_items)[:1000]:
             log(f"  [would restore] {os.path.join(target, rel)}")
         return {"restored": 0, "dryrun": True}
+
+    def _apply_meta(dst, meta):
+        try:
+            os.chmod(dst, stat.S_IMODE(meta["mode"]))
+        except OSError:
+            pass
+        if am_root:
+            try:
+                os.chown(dst, meta["uid"], meta["gid"])
+            except OSError:
+                pass
+        try:
+            os.utime(dst, (meta["mtime"], meta["mtime"]))
+        except OSError:
+            pass
+
+    # Phase 1: create directories shallow first (metadata reapplied last).
+    for rel, _ in sorted(dir_items):
+        try:
+            os.makedirs(os.path.join(target, rel), exist_ok=True)
+        except OSError as e:
+            log(f"  ERROR {rel}: {e}")
 
     def _restore_one(rel, meta):
         src = os.path.join(set_root, rel)
@@ -379,24 +451,13 @@ def restore(backup_dir, setname=None, target="/", workers=None,
             raise FileNotFoundError(src)
         shutil.copy2(src, dst, follow_symlinks=False)
         if reapply_meta:
-            try:
-                os.chmod(dst, stat.S_IMODE(meta["mode"]))
-            except OSError:
-                pass
-            if am_root:
-                try:
-                    os.chown(dst, meta["uid"], meta["gid"])
-                except OSError:
-                    pass
-            try:
-                os.utime(dst, (meta["mtime"], meta["mtime"]))
-            except OSError:
-                pass
+            _apply_meta(dst, meta)
         return meta.get("size", 0)
 
+    # Phase 2: restore files and symlinks in parallel.
     done = restored = errors = 0
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        futs = {ex.submit(_restore_one, rel, meta): rel for rel, meta in items}
+        futs = {ex.submit(_restore_one, rel, meta): rel for rel, meta in file_items}
         for fut in as_completed(futs):
             rel = futs[fut]
             done += 1
@@ -408,6 +469,12 @@ def restore(backup_dir, setname=None, target="/", workers=None,
                 log(f"  ERROR {rel}: {e}")
             if progress:
                 progress(done, total, rel)
+
+    # Phase 3: reapply directory metadata deepest first, so child writes from
+    # phase 2 cannot clobber a directory's mtime afterwards.
+    if reapply_meta:
+        for rel, meta in sorted(dir_items, reverse=True):
+            _apply_meta(os.path.join(target, rel), meta)
 
     log(f"Restore done: {restored} restored, {errors} errors.")
     if reapply_meta and not am_root:

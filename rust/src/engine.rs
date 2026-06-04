@@ -6,6 +6,7 @@ use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use rayon::prelude::*;
 use std::collections::{BTreeMap, HashSet};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use walkdir::WalkDir;
@@ -14,9 +15,18 @@ use crate::crypto::{self, Cipher};
 use crate::manifest::{self, FileMeta, KdfParams, Kind, Manifest, MANIFEST_NAME};
 
 pub const DEFAULT_EXCLUDES: &[&str] = &[
-    "**/.cache/**", "**/.local/share/Trash/**", "**/.thumbnails/**",
-    "**/Cache/**", "**/cache2/**", "**/lost+found",
-    "**/.Spotlight-V100/**", "**/.Trashes/**", "**/.fseventsd/**", "**/.DS_Store",
+    // Both the directory itself and its contents, so excluded dirs are pruned
+    // entirely (now that empty directories are tracked).
+    "**/.cache", "**/.cache/**",
+    "**/.local/share/Trash", "**/.local/share/Trash/**",
+    "**/.thumbnails", "**/.thumbnails/**",
+    "**/Cache", "**/Cache/**",
+    "**/cache2", "**/cache2/**",
+    "**/lost+found",
+    "**/.Spotlight-V100", "**/.Spotlight-V100/**",
+    "**/.Trashes", "**/.Trashes/**",
+    "**/.fseventsd", "**/.fseventsd/**",
+    "**/.DS_Store",
 ];
 
 pub struct Entry {
@@ -68,6 +78,8 @@ fn meta_of(path: &Path) -> Option<FileMeta> {
         (Kind::Symlink, std::fs::read_link(path).map(|p| p.to_string_lossy().into_owned()).unwrap_or_default())
     } else if ft.is_file() {
         (Kind::File, String::new())
+    } else if ft.is_dir() {
+        (Kind::Dir, String::new())
     } else {
         return None;
     };
@@ -85,6 +97,8 @@ fn meta_of(path: &Path) -> Option<FileMeta> {
         (Kind::Symlink, std::fs::read_link(path).map(|p| p.to_string_lossy().into_owned()).unwrap_or_default())
     } else if ft.is_file() {
         (Kind::File, String::new())
+    } else if ft.is_dir() {
+        (Kind::Dir, String::new())
     } else {
         return None;
     };
@@ -127,20 +141,29 @@ fn hash_file(path: &Path) -> Option<String> {
 
 pub fn scan(sources: &[String], excl: &GlobSet) -> Vec<Entry> {
     let mut out = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
     for src in sources {
         let base = std::fs::canonicalize(src).unwrap_or_else(|_| PathBuf::from(src));
-        for de in WalkDir::new(&base).follow_links(false).into_iter().filter_map(|e| e.ok()) {
+        // filter_entry prunes an excluded directory together with its whole
+        // subtree (matching the Python walk), instead of only skipping the entry.
+        let walker = WalkDir::new(&base)
+            .follow_links(false)
+            .into_iter()
+            .filter_entry(|e| !excl.is_match(e.path()));
+        for de in walker.filter_map(|e| e.ok()) {
             let ft = de.file_type();
-            if !ft.is_file() && !ft.is_symlink() {
+            // Directories are tracked too, so empty dirs and dir metadata survive.
+            if !ft.is_file() && !ft.is_symlink() && !ft.is_dir() {
                 continue;
             }
             let p = de.path();
-            if excl.is_match(p) {
-                continue;
-            }
             if let Some(meta) = meta_of(p) {
                 let rel = p.to_string_lossy().trim_start_matches('/').to_string();
-                out.push(Entry { rel, abspath: p.to_path_buf(), meta });
+                // Overlapping sources (e.g. /home and /home/user) would scan the
+                // same path twice; keep the first and skip duplicate copy work.
+                if seen.insert(rel.clone()) {
+                    out.push(Entry { rel, abspath: p.to_path_buf(), meta });
+                }
             }
         }
     }
@@ -167,6 +190,10 @@ fn needs_copy(meta: &FileMeta, prev: Option<&FileMeta>, use_checksum: bool) -> b
 
 fn copy_one(e: &Entry, set_root: &Path, cipher: Cipher, key: Option<&[u8; 32]>) -> Result<u64> {
     let dst = set_root.join(&e.rel);
+    if e.meta.kind == Kind::Dir {
+        std::fs::create_dir_all(&dst)?;
+        return Ok(0);
+    }
     if let Some(parent) = dst.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -184,9 +211,11 @@ fn copy_one(e: &Entry, set_root: &Path, cipher: Cipher, key: Option<&[u8; 32]>) 
             std::fs::copy(&e.abspath, &dst)?;
         }
         _ => {
-            let data = std::fs::read(&e.abspath)?;
-            let blob = crypto::encrypt(cipher, key.ok_or_else(|| anyhow!("missing key"))?, &data)?;
-            std::fs::write(&dst, blob)?;
+            // Streamed AEAD: never holds the whole file in memory.
+            let key = key.ok_or_else(|| anyhow!("missing key"))?;
+            let inf = std::io::BufReader::new(std::fs::File::open(&e.abspath)?);
+            let outf = std::io::BufWriter::new(std::fs::File::create(&dst)?);
+            crypto::encrypt_stream(cipher, key, inf, outf)?;
         }
     }
     Ok(e.meta.size)
@@ -214,7 +243,8 @@ where
 
     log("Scanning sources ...");
     let mut entries = scan(&sources, &excl);
-    log(&format!("{} files found.", entries.len()));
+    let n_dirs = entries.iter().filter(|e| e.meta.kind == Kind::Dir).count();
+    log(&format!("{} files, {} dirs found.", entries.len() - n_dirs, n_dirs));
 
     if opt.use_checksum {
         log("Computing BLAKE3 (parallel across all cores) ...");
@@ -251,11 +281,15 @@ where
         (None, None)
     };
 
+    // Directories are tracked separately: always (re)created so empty dirs
+    // survive, but never counted as changed/unchanged.
+    let n_files = entries.iter().filter(|e| e.meta.kind != Kind::Dir).count();
     let todo: Vec<&Entry> = entries
         .iter()
-        .filter(|e| needs_copy(&e.meta, prev_files.get(&e.rel), opt.use_checksum))
+        .filter(|e| e.meta.kind != Kind::Dir
+            && needs_copy(&e.meta, prev_files.get(&e.rel), opt.use_checksum))
         .collect();
-    let unchanged = (entries.len() - todo.len()) as u64;
+    let unchanged = (n_files - todo.len()) as u64;
     let current: HashSet<&String> = entries.iter().map(|e| &e.rel).collect();
     let deletions: Vec<String> = prev_files.keys().filter(|k| !current.contains(k)).cloned().collect();
     log(&format!(
@@ -271,6 +305,10 @@ where
     }
 
     std::fs::create_dir_all(&set_root)?;
+    // Recreate every source directory (incl. empty ones) before copying files.
+    for e in entries.iter().filter(|e| e.meta.kind == Kind::Dir) {
+        let _ = std::fs::create_dir_all(set_root.join(&e.rel));
+    }
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(opt.workers.max(1))
         .build()?;
@@ -297,12 +335,19 @@ where
         });
     });
 
-    // Mirror deletions
+    // Mirror deletions: vanished files first, then now-empty dirs deepest-first.
     let mut deleted = 0u64;
     if opt.prune {
-        for rel in &deletions {
-            let tgt = set_root.join(rel);
-            if std::fs::remove_file(&tgt).is_ok() {
+        let is_dir = |r: &String| prev_files.get(r).map(|m| m.kind == Kind::Dir).unwrap_or(false);
+        for rel in deletions.iter().filter(|r| !is_dir(r)) {
+            if std::fs::remove_file(set_root.join(rel)).is_ok() {
+                deleted += 1;
+            }
+        }
+        let mut del_dirs: Vec<&String> = deletions.iter().filter(|r| is_dir(r)).collect();
+        del_dirs.sort_unstable();
+        for rel in del_dirs.iter().rev() {
+            if std::fs::remove_dir(set_root.join(rel)).is_ok() {
                 deleted += 1;
             }
         }
@@ -402,15 +447,31 @@ where
     };
 
     let target = PathBuf::from(&opt.target);
-    let items: Vec<(String, FileMeta)> = man.files.into_iter().collect();
-    let total = items.len() as u64;
-    log(&format!("Restoring {} entries -> {}", total, target.display()));
+    // Split dirs from files; dir_items stays sorted ascending (shallow first).
+    let mut dir_items: Vec<(String, FileMeta)> = Vec::new();
+    let mut file_items: Vec<(String, FileMeta)> = Vec::new();
+    for (rel, meta) in man.files.into_iter() {
+        if !is_safe_rel(&rel) {
+            log(&format!("  SKIP unsafe path in manifest: {rel}"));
+            continue;
+        }
+        if meta.kind == Kind::Dir { dir_items.push((rel, meta)); } else { file_items.push((rel, meta)); }
+    }
+    let total = file_items.len() as u64;
+    log(&format!("Restoring {} files, {} dirs -> {}", file_items.len(), dir_items.len(), target.display()));
 
     if opt.dry_run {
-        for (rel, _) in items.iter().take(1000) {
+        for (rel, _) in dir_items.iter().chain(file_items.iter()).take(1000) {
             log(&format!("  [would restore] {}", target.join(rel).display()));
         }
         return Ok(Stats::default());
+    }
+
+    // Phase 1: create directories shallow first (metadata reapplied in phase 3).
+    for (rel, _) in &dir_items {
+        if let Err(e) = std::fs::create_dir_all(target.join(rel)) {
+            log(&format!("  ERROR {}: {}", rel, e));
+        }
     }
 
     let pool = rayon::ThreadPoolBuilder::new().num_threads(opt.workers.max(1)).build()?;
@@ -418,8 +479,9 @@ where
     let restored = AtomicU64::new(0);
     let errors = AtomicU64::new(0);
 
+    // Phase 2: restore files and symlinks in parallel.
     pool.install(|| {
-        items.par_iter().for_each(|(rel, meta)| {
+        file_items.par_iter().for_each(|(rel, meta)| {
             let res = (|| -> Result<()> {
                 let src = set_root.join(rel);
                 let dst = target.join(rel);
@@ -439,9 +501,21 @@ where
                         std::fs::copy(&src, &dst)?;
                     }
                     _ => {
-                        let blob = std::fs::read(&src)?;
-                        let data = crypto::decrypt(cipher, key.as_ref().unwrap(), &blob)?;
-                        std::fs::write(&dst, data)?;
+                        let key = key.as_ref().unwrap();
+                        let mut magic = [0u8; 6];
+                        let is_stream = std::fs::File::open(&src)?.read_exact(&mut magic).is_ok()
+                            && &magic == crypto::STREAM_MAGIC;
+                        if is_stream {
+                            // Streamed format: decrypt chunk by chunk.
+                            let inf = std::io::BufReader::new(std::fs::File::open(&src)?);
+                            let outf = std::io::BufWriter::new(std::fs::File::create(&dst)?);
+                            crypto::decrypt_stream(cipher, key, inf, outf)?;
+                        } else {
+                            // Legacy whole-file blob (backups written before streaming).
+                            let blob = std::fs::read(&src)?;
+                            let data = crypto::decrypt(cipher, key, &blob)?;
+                            std::fs::write(&dst, data)?;
+                        }
                     }
                 }
                 if opt.reapply_meta {
@@ -458,6 +532,14 @@ where
         });
     });
 
+    // Phase 3: reapply directory metadata deepest-first, so child writes from
+    // phase 2 cannot clobber a directory's mtime afterwards.
+    if opt.reapply_meta {
+        for (rel, meta) in dir_items.iter().rev() {
+            apply_meta(&target.join(rel), meta);
+        }
+    }
+
     let stats = Stats {
         copied: restored.load(Ordering::Relaxed),
         errors: errors.load(Ordering::Relaxed),
@@ -467,13 +549,25 @@ where
     Ok(stats)
 }
 
+/// Reject manifest paths that would escape the restore target (absolute paths or
+/// any `..` component). Manifests written by scan() are always safe; this guards
+/// against a tampered or hand-edited manifest.
+fn is_safe_rel(rel: &str) -> bool {
+    use std::path::Component;
+    let p = Path::new(rel);
+    !rel.is_empty()
+        && !p.is_absolute()
+        && p.components().all(|c| matches!(c, Component::Normal(_) | Component::CurDir))
+}
+
 pub fn list_sets(dest: &str) -> Vec<(String, String, String, usize)> {
     let mut out = Vec::new();
     if let Ok(rd) = std::fs::read_dir(dest) {
         for e in rd.flatten() {
             let mp = e.path().join(MANIFEST_NAME);
             if let Some(m) = manifest::load(&mp) {
-                out.push((m.set, m.host, m.created, m.files.len()));
+                let nfiles = m.files.values().filter(|f| f.kind != Kind::Dir).count();
+                out.push((m.set, m.host, m.created, nfiles));
             }
         }
     }
