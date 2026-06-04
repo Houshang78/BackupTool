@@ -1,0 +1,95 @@
+name: Release
+
+# Cut a release by pushing a tag:  git tag v1.0.0 && git push origin v1.0.0
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  # ---- Rust: self-contained CLI + GUI binaries per OS ----
+  rust:
+    name: rust ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: rust
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,  name: linux-x86_64 }
+          - { os: macos-latest,   name: macos-arm64 }
+          - { os: windows-latest, name: windows-x86_64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install GUI system libraries (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y
+             libfontconfig1-dev libxcb1-dev libxkbcommon-dev libwayland-dev
+      - name: Build CLI + GUI (release)
+        run: |
+          cargo build --release --bin backuptool
+          cargo build --release --features gui --bin backuptool-gui
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist-rel
+          cp target/release/backuptool target/release/backuptool-gui dist-rel/
+          cp README.md LICENSE dist-rel/
+          tar -czf "backuptool-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" -C dist-rel .
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist-rel | Out-Null
+          Copy-Item target\release\backuptool.exe, target\release\backuptool-gui.exe, README.md, LICENSE dist-rel\
+          Compress-Archive -Path dist-rel\* -DestinationPath "backuptool-${{ github.ref_name }}-${{ matrix.name }}.zip"
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            rust/backuptool-${{ github.ref_name }}-*.tar.gz
+            rust/backuptool-${{ github.ref_name }}-*.zip
+          fail_on_unmatched_files: false
+
+  # ---- Python: native installers via the packaging scripts ----
+  python:
+    name: python ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: python
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build .deb (Linux)
+        if: runner.os == 'Linux'
+        run: bash packaging/build-deb.sh
+      - name: Build .pkg + .app (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          bash packaging/build-macos.sh
+          tar -czf "dist/backuptool-${{ github.ref_name }}-macos-app.tar.gz" -C dist backuptool.app
+      - name: Build .exe (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File packaging\build-windows.ps1
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            python/dist/*.deb
+            python/dist/*.pkg
+            python/dist/*.exe
+            python/dist/*macos-app.tar.gz
+          fail_on_unmatched_files: false

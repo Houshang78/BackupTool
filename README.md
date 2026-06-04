@@ -31,6 +31,13 @@ cargo run --release --features gui --bin backuptool-gui
 cargo test
 ```
 
+## Releases
+Pushing a tag builds and publishes binaries/installers for Linux, macOS and Windows
+(Rust CLI + GUI archives, plus `.deb` / `.pkg` / `.exe`) via GitHub Actions:
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
 ## Which one should I use?
 - **Python** — fastest to run/modify, great Qt GUI, no compiler needed.
 - **Rust** — one dependency-free binary, built-in encryption, top hashing speed.

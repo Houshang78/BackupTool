@@ -1,31 +1,36 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { Button, LineEdit, ComboBox, CheckBox, SpinBox, GroupBox, VerticalBox, HorizontalBox, ScrollView } from "std-widgets.slint";
+import { Button, LineEdit, ComboBox, CheckBox, SpinBox, GroupBox, VerticalBox, HorizontalBox, ScrollView, TabWidget } from "std-widgets.slint";
 
 export component MainWindow inherits Window {
     title: root.win-title;
-    preferred-width: 800px;
-    preferred-height: 660px;
-    min-width: 640px;
+    preferred-width: 820px;
+    preferred-height: 720px;
+    min-width: 680px;
 
-    // --- data properties (read/written by Rust) ---
-    in-out property <string> sources;        // separated by ';'
-    in-out property <string> dest;
-    in-out property <string> setname;
-    in-out property <int> workers: 4;
-    in-out property <bool> checksum;
-    in-out property <bool> delete-missing;
-    in-out property <string> cipher: "none"; // none | aes256gcm | chacha20poly1305
-    in-out property <string> passphrase;
+    // --- shared ---
     in property <float> progress;            // 0.0 .. 1.0
     in property <string> status;
     in property <string> logtext;
     in property <bool> running;
 
-    // --- i18n: label texts + language list ---
+    // --- language ---
     in property <string> win-title: "backuptool";
     in property <[string]> languages;
     in-out property <int> lang-index;
     in property <string> t-language: "Language:";
+
+    // --- backup tab: data ---
+    in-out property <string> sources;
+    in-out property <string> dest;
+    in-out property <string> setname;
+    in-out property <int> workers: 4;
+    in-out property <bool> checksum;
+    in-out property <bool> delete-missing;
+    in-out property <string> cipher: "none";
+    in-out property <string> passphrase;
+
+    // --- backup tab: labels ---
+    in property <string> t-tab-backup: "Backup";
     in property <string> t-sources: "Sources";
     in property <string> t-pick: "Choose";
     in property <string> t-dest: "Destination:";
@@ -37,12 +42,36 @@ export component MainWindow inherits Window {
     in property <string> t-password: "Password";
     in property <string> t-start: "Start backup";
     in property <string> t-running: "running ...";
+    in property <string> t-dry: "Dry run";
 
-    // --- actions -> Rust ---
+    // --- restore tab: data ---
+    in-out property <string> r-folder;
+    in-out property <[string]> r-sets;
+    in-out property <int> r-set-index;
+    in-out property <string> r-target: "/";
+    in-out property <int> r-workers: 4;
+    in-out property <bool> r-reapply: true;
+    in-out property <bool> r-dry;
+    in-out property <string> r-passphrase;
+
+    // --- restore tab: labels ---
+    in property <string> t-tab-restore: "Restore";
+    in property <string> t-folder: "Backup folder:";
+    in property <string> t-rset: "Backup set:";
+    in property <string> t-loadsets: "Load sets";
+    in property <string> t-target: "Target root:";
+    in property <string> t-reapply: "Reapply permissions/owner";
+    in property <string> t-start-restore: "Start restore";
+
+    // --- callbacks ---
     callback pick-source();
     callback pick-dest();
     callback start-backup();
     callback language-changed(int);
+    callback pick-folder();
+    callback pick-target();
+    callback load-sets();
+    callback start-restore();
 
     VerticalBox {
         padding: 12px;
@@ -58,53 +87,85 @@ export component MainWindow inherits Window {
             }
         }
 
-        GroupBox {
-            title: root.t-sources;
-            HorizontalBox {
-                LineEdit { text <=> root.sources; placeholder-text: "/path/a;/path/b"; }
-                Button { text: root.t-pick; clicked => { root.pick-source(); } }
-            }
-        }
-
-        HorizontalBox {
-            Text { vertical-alignment: center; text: root.t-dest; }
-            LineEdit { text <=> root.dest; placeholder-text: "/Volumes/Backup"; }
-            Button { text: root.t-pick; clicked => { root.pick-dest(); } }
-        }
-
-        HorizontalBox {
-            Text { vertical-alignment: center; text: root.t-set; }
-            LineEdit { text <=> root.setname; }
-            Text { vertical-alignment: center; text: root.t-workers; }
-            SpinBox { value <=> root.workers; minimum: 1; maximum: 64; }
-        }
-
-        GroupBox {
-            VerticalBox {
-                HorizontalBox {
-                    CheckBox { text: root.t-checksum; checked <=> root.checksum; }
-                    CheckBox { text: root.t-delete; checked <=> root.delete-missing; }
-                }
-                HorizontalBox {
-                    Text { vertical-alignment: center; text: root.t-encryption; }
-                    ComboBox {
-                        model: ["none", "aes256gcm", "chacha20poly1305"];
-                        current-value <=> root.cipher;
+        TabWidget {
+            Tab {
+                title: root.t-tab-backup;
+                VerticalBox {
+                    padding: 8px; spacing: 8px;
+                    GroupBox {
+                        title: root.t-sources;
+                        HorizontalBox {
+                            LineEdit { text <=> root.sources; placeholder-text: "/path/a;/path/b"; }
+                            Button { text: root.t-pick; clicked => { root.pick-source(); } }
+                        }
                     }
-                    LineEdit {
-                        placeholder-text: root.t-password;
-                        text <=> root.passphrase;
-                        input-type: password;
-                        enabled: root.cipher != "none";
+                    HorizontalBox {
+                        Text { vertical-alignment: center; text: root.t-dest; }
+                        LineEdit { text <=> root.dest; placeholder-text: "/Volumes/Backup"; }
+                        Button { text: root.t-pick; clicked => { root.pick-dest(); } }
+                    }
+                    HorizontalBox {
+                        Text { vertical-alignment: center; text: root.t-set; }
+                        LineEdit { text <=> root.setname; }
+                        Text { vertical-alignment: center; text: root.t-workers; }
+                        SpinBox { value <=> root.workers; minimum: 1; maximum: 64; }
+                    }
+                    HorizontalBox {
+                        CheckBox { text: root.t-checksum; checked <=> root.checksum; }
+                        CheckBox { text: root.t-delete; checked <=> root.delete-missing; }
+                    }
+                    HorizontalBox {
+                        Text { vertical-alignment: center; text: root.t-encryption; }
+                        ComboBox { model: ["none", "aes256gcm", "chacha20poly1305"]; current-value <=> root.cipher; }
+                        LineEdit {
+                            placeholder-text: root.t-password;
+                            text <=> root.passphrase;
+                            input-type: password;
+                            enabled: root.cipher != "none";
+                        }
+                    }
+                    Button {
+                        text: root.running ? root.t-running : root.t-start;
+                        enabled: !root.running;
+                        clicked => { root.start-backup(); }
                     }
                 }
             }
-        }
-
-        Button {
-            text: root.running ? root.t-running : root.t-start;
-            enabled: !root.running;
-            clicked => { root.start-backup(); }
+            Tab {
+                title: root.t-tab-restore;
+                VerticalBox {
+                    padding: 8px; spacing: 8px;
+                    HorizontalBox {
+                        Text { vertical-alignment: center; text: root.t-folder; }
+                        LineEdit { text <=> root.r-folder; placeholder-text: "/Volumes/Backup"; }
+                        Button { text: root.t-pick; clicked => { root.pick-folder(); } }
+                    }
+                    HorizontalBox {
+                        Text { vertical-alignment: center; text: root.t-rset; }
+                        ComboBox { model: root.r-sets; current-index <=> root.r-set-index; }
+                        Button { text: root.t-loadsets; clicked => { root.load-sets(); } }
+                    }
+                    HorizontalBox {
+                        Text { vertical-alignment: center; text: root.t-target; }
+                        LineEdit { text <=> root.r-target; }
+                        Button { text: root.t-pick; clicked => { root.pick-target(); } }
+                    }
+                    HorizontalBox {
+                        Text { vertical-alignment: center; text: root.t-workers; }
+                        SpinBox { value <=> root.r-workers; minimum: 1; maximum: 64; }
+                        LineEdit { placeholder-text: root.t-password; text <=> root.r-passphrase; input-type: password; }
+                    }
+                    HorizontalBox {
+                        CheckBox { text: root.t-reapply; checked <=> root.r-reapply; }
+                        CheckBox { text: root.t-dry; checked <=> root.r-dry; }
+                    }
+                    Button {
+                        text: root.running ? root.t-running : root.t-start-restore;
+                        enabled: !root.running;
+                        clicked => { root.start-restore(); }
+                    }
+                }
+            }
         }
 
         Rectangle {
@@ -122,7 +183,7 @@ export component MainWindow inherits Window {
         Text { text: root.status; }
 
         ScrollView {
-            min-height: 200px;
+            min-height: 160px;
             Text { text: root.logtext; wrap: word-wrap; }
         }
     }
