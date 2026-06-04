@@ -43,6 +43,7 @@ pub struct BackupOptions {
     pub excludes: Vec<String>,
     pub prune: bool,
     pub dry_run: bool,
+    pub include_system: bool,
     pub cipher: Cipher,
     pub passphrase: Option<String>,
 }
@@ -99,6 +100,22 @@ fn build_globset(extra: &[String]) -> Result<GlobSet> {
         b.add(Glob::new(&g).map_err(|e| anyhow!("exclude pattern '{g}': {e}"))?);
     }
     Ok(b.build()?)
+}
+
+/// Curated system directories worth backing up (e.g. /etc). Returns the ones that
+/// exist — best read as root. Unreadable entries are simply skipped during scan.
+pub fn system_dirs() -> Vec<String> {
+    let cands: &[&str] = if cfg!(target_os = "macos") {
+        &["/etc", "/usr/local/etc", "/opt"]
+    } else if cfg!(target_os = "linux") {
+        &["/etc", "/usr/local/etc", "/opt", "/srv", "/root", "/var/spool/cron"]
+    } else {
+        &[]
+    };
+    cands.iter()
+        .filter(|d| Path::new(d).is_dir())
+        .map(|s| s.to_string())
+        .collect()
 }
 
 fn hash_file(path: &Path) -> Option<String> {
@@ -187,8 +204,16 @@ where
     let prev_files: BTreeMap<String, FileMeta> =
         prev.as_ref().map(|m| m.files.clone()).unwrap_or_default();
 
+    let mut sources = opt.sources.clone();
+    if opt.include_system {
+        let sd = system_dirs();
+        log(&format!("Including system directories: {}",
+            if sd.is_empty() { "(none)".to_string() } else { sd.join(", ") }));
+        sources.extend(sd);
+    }
+
     log("Scanning sources ...");
-    let mut entries = scan(&opt.sources, &excl);
+    let mut entries = scan(&sources, &excl);
     log(&format!("{} files found.", entries.len()));
 
     if opt.use_checksum {
@@ -307,6 +332,31 @@ where
         deleted,
         errors: errors.load(Ordering::Relaxed),
     };
+
+    // Per-run, dated log listing exactly which full paths changed/were removed.
+    let logdir = set_root.join(".backuptool-logs");
+    if std::fs::create_dir_all(&logdir).is_ok() {
+        let stamp = man.created.replace([':', '-'], "").replace('T', "-");
+        let logpath = logdir.join(format!("backup-{stamp}.log"));
+        let mut s = String::new();
+        s.push_str(&format!("# backuptool  set={}  host={}  {}\n", man.set, man.host, man.created));
+        s.push_str(&format!("# changed/new={} unchanged={} deleted={} errors={}\n",
+            stats.copied, stats.skipped, stats.deleted, stats.errors));
+        let mut changed: Vec<&str> = todo.iter().map(|e| e.rel.as_str()).collect();
+        changed.sort_unstable();
+        for r in changed {
+            s.push_str(&format!("CHANGED\t/{r}\n"));
+        }
+        let mut dels = deletions.clone();
+        dels.sort_unstable();
+        for r in &dels {
+            s.push_str(&format!("DELETED\t/{r}\n"));
+        }
+        if std::fs::write(&logpath, s).is_ok() {
+            log(&format!("Log written: {}", logpath.display()));
+        }
+    }
+
     log(&format!(
         "Done: {} copied, {} skipped, {} removed, {} errors.",
         stats.copied, stats.skipped, stats.deleted, stats.errors
@@ -456,6 +506,13 @@ mod tests {
     fn changed_size_or_mtime_copies() {
         assert!(needs_copy(&fm(11, 100), Some(&fm(10, 100)), false));
         assert!(needs_copy(&fm(10, 101), Some(&fm(10, 100)), false));
+    }
+
+    #[test]
+    fn system_dirs_all_exist() {
+        for d in system_dirs() {
+            assert!(std::path::Path::new(&d).is_dir());
+        }
     }
 
     #[test]

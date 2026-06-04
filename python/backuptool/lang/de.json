@@ -15,6 +15,7 @@
   "excludes": "Ausschlüsse (mit Komma):",
   "opt_checksum": "Abgleich per Prüfsumme (genauer, Multicore)",
   "opt_delete": "Gelöschtes im Ziel spiegeln",
+  "opt_system": "Systemdateien einbeziehen (/etc, …) — benötigt root",
   "opt_dryrun": "Probelauf (nichts schreiben)",
   "encryption": "Verschlüsselung:",
   "password": "Passwort",

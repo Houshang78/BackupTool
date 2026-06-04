@@ -57,6 +57,17 @@ backuptool backup ~/ -d /Volumes/Backup -s my-laptop
 backuptool list -d /Volumes/Backup             # see all sets on the drive
 ```
 
+### System directories (run as root)
+When you run as **root** (`sudo`), curated system directories are included
+**automatically**: `/etc`, `/usr/local/etc`, `/opt` (plus `/srv`, `/root`,
+`/var/spool/cron` on Linux). They are stored under their full paths and updated
+incrementally like everything else. Control it explicitly:
+```bash
+sudo backuptool backup ~/ -d /Volumes/Backup --system     # force include (any user)
+backuptool backup ~/ -d /Volumes/Backup --no-system       # never include, even as root
+```
+Only readable entries are captured — without root, most of `/etc` is skipped.
+
 ---
 
 ## 3. Excluding directories / files
@@ -102,6 +113,19 @@ backuptool backup ~/ -d /Volumes/Backup -j 8
 
 # Dry run: show what would happen, write nothing
 backuptool backup ~/ -d /Volumes/Backup -n
+```
+
+### Per-run logs (with date)
+Every real backup writes a dated log to
+`<<dest>>/<<set>>/.backuptool-logs/backup-YYYYmmdd-HHMMSS.log`, listing the **full
+path** of each changed/new file (`CHANGED`) and each removed file (`DELETED`) plus a
+summary header (set, host, date, counts). Use it to see exactly **what changed and
+when**:
+```
+# backuptool  set=my-laptop  host=server01  2026-06-04T18:13:46
+# changed/new=2 unchanged=120 deleted=0 errors=0
+CHANGED	/etc/hosts
+CHANGED	/home/me/Documents/notes.md
 ```
 
 ---
@@ -193,7 +217,8 @@ or `./backuptool-portable` with no arguments (Python).
 ## 9. Full CLI reference
 
 ```
-backup  SOURCES...  -d DEST  [-s SET] [-c] [-j N] [-e PATTERN ...] [--delete] [-n]
+backup  SOURCES...  -d DEST  [-s SET] [-c] [-j N] [-e PATTERN ...] [--delete]
+                    [--system|--no-system] [-n]
                     [--cipher none|aes256gcm|chacha20poly1305]   (Rust only)
 restore -S SOURCE   [-s SET] [-t TARGET] [-j N] [--no-meta] [-n]
 list    -d DEST
@@ -207,6 +232,7 @@ list    -d DEST
 | `-j N` | parallel workers (default: CPU cores) |
 | `-e` | exclude pattern, repeatable (syntax differs — see §3) |
 | `--delete` | mirror deletions in the destination |
+| `--system` / `--no-system` | include system dirs (/etc, …); auto-on as root |
 | `--cipher` | encryption (Rust only) |
 | `-n` | dry run |
 | `-S` | backup folder (restore) |

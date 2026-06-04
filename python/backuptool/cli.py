@@ -15,10 +15,15 @@ def _add_common(p):
 
 
 def cmd_backup(a):
+    import os
+    if a.system is None:  # auto: include system dirs when running as root
+        include_system = hasattr(os, "geteuid") and os.geteuid() == 0
+    else:
+        include_system = a.system
     return core.backup(
         sources=a.sources, dest=a.dest, setname=a.set, workers=a.workers,
         use_checksum=a.checksum, extra_excludes=a.exclude, prune=a.delete,
-        dry_run=a.dry_run, log=print,
+        dry_run=a.dry_run, include_system=include_system, log=print,
         progress=_progress if a.progress else None,
     )
 
@@ -67,6 +72,10 @@ def build_parser():
                    help="additional exclude pattern (repeatable)")
     b.add_argument("--delete", action="store_true",
                    help="delete in destination what was removed from source (mirror)")
+    b.add_argument("--system", dest="system", action="store_true", default=None,
+                   help="also back up system dirs (/etc, ...); automatic as root")
+    b.add_argument("--no-system", dest="system", action="store_false",
+                   help="do not include system dirs even when running as root")
     b.add_argument("--progress", action="store_true", help="show progress")
     _add_common(b)
     b.set_defaults(func=cmd_backup)

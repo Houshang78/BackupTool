@@ -26,6 +26,7 @@ export component MainWindow inherits Window {
     in-out property <int> workers: 4;
     in-out property <bool> checksum;
     in-out property <bool> delete-missing;
+    in-out property <bool> system;
     in-out property <string> cipher: "none";
     in-out property <string> passphrase;
 
@@ -43,6 +44,7 @@ export component MainWindow inherits Window {
     in property <string> t-start: "Start backup";
     in property <string> t-running: "running ...";
     in property <string> t-dry: "Dry run";
+    in property <string> t-system: "System files";
 
     // --- restore tab: data ---
     in-out property <string> r-folder;
@@ -113,6 +115,7 @@ export component MainWindow inherits Window {
                     HorizontalBox {
                         CheckBox { text: root.t-checksum; checked <=> root.checksum; }
                         CheckBox { text: root.t-delete; checked <=> root.delete-missing; }
+                        CheckBox { text: root.t-system; checked <=> root.system; }
                     }
                     HorizontalBox {
                         Text { vertical-alignment: center; text: root.t-encryption; }

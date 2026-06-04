@@ -47,6 +47,18 @@ def default_workers() -> int:
     return max(1, (os.cpu_count() or 2))
 
 
+def system_dirs() -> list:
+    """Curated system directories worth backing up (e.g. /etc). Returns the ones
+    that exist and are readable — best run as root to read them fully."""
+    if sys.platform == "darwin":
+        cands = ["/etc", "/usr/local/etc", "/opt"]
+    elif sys.platform.startswith("linux"):
+        cands = ["/etc", "/usr/local/etc", "/opt", "/srv", "/root", "/var/spool/cron"]
+    else:
+        cands = []
+    return [d for d in cands if os.path.isdir(d) and os.access(d, os.R_OK)]
+
+
 def human(n: float) -> str:
     for unit in ("B", "KB", "MB", "GB", "TB"):
         if n < 1024:
@@ -205,12 +217,18 @@ def copy_one(meta: dict, set_root: str, rel: str):
 # ----------------------------------------------------------------------------
 def backup(sources, dest, setname=None, workers=None, use_checksum=False,
            extra_excludes=None, prune=False, dry_run=False,
-           log=print, progress=None):
+           include_system=False, log=print, progress=None):
     workers = workers or default_workers()
     excludes = list(extra_excludes or []) + DEFAULT_EXCLUDES
     setname = setname or socket.gethostname()
     set_root = os.path.join(os.path.abspath(dest), setname)
     manifest_path = os.path.join(set_root, MANIFEST_NAME)
+
+    sources = list(sources)
+    if include_system:
+        sysdirs = system_dirs()
+        log(f"Including system directories: {', '.join(sysdirs) or '(none)'}")
+        sources += sysdirs
 
     prev = load_manifest(manifest_path)
     prev_files = prev.get("files", {}) if prev else {}
@@ -290,10 +308,31 @@ def backup(sources, dest, setname=None, workers=None, use_checksum=False,
                   for r, m in entries.items()},
     }
     save_manifest(manifest_path, man, set_root)
+
+    # Per-run, dated log listing exactly which full paths changed/were removed.
+    logpath = None
+    try:
+        logdir = os.path.join(set_root, ".backuptool-logs")
+        os.makedirs(logdir, exist_ok=True)
+        stamp = man["created"].replace(":", "").replace("-", "").replace("T", "-")
+        logpath = os.path.join(logdir, f"backup-{stamp}.log")
+        with open(logpath, "w", encoding="utf-8") as lf:
+            lf.write(f"# backuptool  set={setname}  host={man['host']}  {man['created']}\n")
+            lf.write(f"# sources: {', '.join(man['sources'])}\n")
+            lf.write(f"# changed/new={copied} unchanged={unchanged} deleted={deleted} "
+                     f"errors={errors} bytes={copied_bytes}\n")
+            for r in sorted(todo):
+                lf.write(f"CHANGED\t/{r}\n")
+            for r in sorted(deletions):
+                lf.write(f"DELETED\t/{r}\n")
+        log(f"Log written: {logpath}")
+    except OSError:
+        pass
+
     log(f"Done: {copied} copied ({human(copied_bytes)}), {unchanged} skipped, "
         f"{deleted} removed, {errors} errors.")
     return {"copied": copied, "skipped": unchanged, "bytes": copied_bytes,
-            "deleted": deleted, "errors": errors}
+            "deleted": deleted, "errors": errors, "log": logpath}
 
 
 # ----------------------------------------------------------------------------

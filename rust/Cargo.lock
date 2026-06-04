@@ -642,6 +642,7 @@ dependencies = [
  "gethostname 0.4.3",
  "globset",
  "indicatif",
+ "libc",
  "rand 0.8.6",
  "rayon",
  "rfd",

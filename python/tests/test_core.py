@@ -62,6 +62,18 @@ class TestCore(unittest.TestCase):
         self.assertEqual(len(sets), 1)
         self.assertEqual(sets[0]["set"], "myhost")
 
+    def test_log_written(self):
+        res = core.backup([self.src], self.dst, setname="t", log=_silent)
+        self.assertTrue(res["log"] and os.path.exists(res["log"]))
+        with open(res["log"], encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("CHANGED", text)
+        self.assertIn("# backuptool", text)
+
+    def test_system_dirs_exist(self):
+        for d in core.system_dirs():
+            self.assertTrue(os.path.isdir(d))
+
 
 if __name__ == "__main__":
     unittest.main()

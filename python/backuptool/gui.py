@@ -142,8 +142,10 @@ class MainWindow(QMainWindow):
 
         self.cb_checksum = QCheckBox()
         self.cb_delete = QCheckBox()
+        self.cb_system = QCheckBox()
         self.cb_dry = QCheckBox()
-        lay.addWidget(self.cb_checksum); lay.addWidget(self.cb_delete); lay.addWidget(self.cb_dry)
+        lay.addWidget(self.cb_checksum); lay.addWidget(self.cb_delete)
+        lay.addWidget(self.cb_system); lay.addWidget(self.cb_dry)
 
         self.btn_start_backup = QPushButton()
         self.btn_start_backup.clicked.connect(self._start_backup)
@@ -184,6 +186,7 @@ class MainWindow(QMainWindow):
             setname=self.setname.text() or None, workers=self.workers.value(),
             use_checksum=self.cb_checksum.isChecked(), extra_excludes=excludes,
             prune=self.cb_delete.isChecked(), dry_run=self.cb_dry.isChecked(),
+            include_system=self.cb_system.isChecked(),
         )
         self._run(core.backup, kwargs, self.tr_("tab_backup"))
 
@@ -284,6 +287,7 @@ class MainWindow(QMainWindow):
         self.lbl_excl.setText(t("excludes"))
         self.cb_checksum.setText(t("opt_checksum"))
         self.cb_delete.setText(t("opt_delete"))
+        self.cb_system.setText(t("opt_system"))
         self.cb_dry.setText(t("opt_dryrun"))
         self.btn_start_backup.setText(t("start_backup"))
         # restore tab

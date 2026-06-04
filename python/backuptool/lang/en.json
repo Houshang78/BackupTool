@@ -15,6 +15,7 @@
   "excludes": "Excludes (comma-separated):",
   "opt_checksum": "Compare by checksum (more accurate, multicore)",
   "opt_delete": "Mirror deletions in destination",
+  "opt_system": "Include system files (/etc, …) — needs root",
   "opt_dryrun": "Dry run (write nothing)",
   "encryption": "Encryption:",
   "password": "Password",
