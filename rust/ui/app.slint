@@ -1,0 +1,129 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+import { Button, LineEdit, ComboBox, CheckBox, SpinBox, GroupBox, VerticalBox, HorizontalBox, ScrollView } from "std-widgets.slint";
+
+export component MainWindow inherits Window {
+    title: root.win-title;
+    preferred-width: 800px;
+    preferred-height: 660px;
+    min-width: 640px;
+
+    // --- data properties (read/written by Rust) ---
+    in-out property <string> sources;        // separated by ';'
+    in-out property <string> dest;
+    in-out property <string> setname;
+    in-out property <int> workers: 4;
+    in-out property <bool> checksum;
+    in-out property <bool> delete-missing;
+    in-out property <string> cipher: "none"; // none | aes256gcm | chacha20poly1305
+    in-out property <string> passphrase;
+    in property <float> progress;            // 0.0 .. 1.0
+    in property <string> status;
+    in property <string> logtext;
+    in property <bool> running;
+
+    // --- i18n: label texts + language list ---
+    in property <string> win-title: "backuptool";
+    in property <[string]> languages;
+    in-out property <int> lang-index;
+    in property <string> t-language: "Language:";
+    in property <string> t-sources: "Sources";
+    in property <string> t-pick: "Choose";
+    in property <string> t-dest: "Destination:";
+    in property <string> t-set: "Backup set:";
+    in property <string> t-workers: "Workers:";
+    in property <string> t-checksum: "Checksum compare";
+    in property <string> t-delete: "Mirror deletions";
+    in property <string> t-encryption: "Encryption:";
+    in property <string> t-password: "Password";
+    in property <string> t-start: "Start backup";
+    in property <string> t-running: "running ...";
+
+    // --- actions -> Rust ---
+    callback pick-source();
+    callback pick-dest();
+    callback start-backup();
+    callback language-changed(int);
+
+    VerticalBox {
+        padding: 12px;
+        spacing: 8px;
+
+        HorizontalBox {
+            alignment: end;
+            Text { vertical-alignment: center; text: root.t-language; }
+            ComboBox {
+                model: root.languages;
+                current-index <=> root.lang-index;
+                selected => { root.language-changed(self.current-index); }
+            }
+        }
+
+        GroupBox {
+            title: root.t-sources;
+            HorizontalBox {
+                LineEdit { text <=> root.sources; placeholder-text: "/path/a;/path/b"; }
+                Button { text: root.t-pick; clicked => { root.pick-source(); } }
+            }
+        }
+
+        HorizontalBox {
+            Text { vertical-alignment: center; text: root.t-dest; }
+            LineEdit { text <=> root.dest; placeholder-text: "/Volumes/Backup"; }
+            Button { text: root.t-pick; clicked => { root.pick-dest(); } }
+        }
+
+        HorizontalBox {
+            Text { vertical-alignment: center; text: root.t-set; }
+            LineEdit { text <=> root.setname; }
+            Text { vertical-alignment: center; text: root.t-workers; }
+            SpinBox { value <=> root.workers; minimum: 1; maximum: 64; }
+        }
+
+        GroupBox {
+            VerticalBox {
+                HorizontalBox {
+                    CheckBox { text: root.t-checksum; checked <=> root.checksum; }
+                    CheckBox { text: root.t-delete; checked <=> root.delete-missing; }
+                }
+                HorizontalBox {
+                    Text { vertical-alignment: center; text: root.t-encryption; }
+                    ComboBox {
+                        model: ["none", "aes256gcm", "chacha20poly1305"];
+                        current-value <=> root.cipher;
+                    }
+                    LineEdit {
+                        placeholder-text: root.t-password;
+                        text <=> root.passphrase;
+                        input-type: password;
+                        enabled: root.cipher != "none";
+                    }
+                }
+            }
+        }
+
+        Button {
+            text: root.running ? root.t-running : root.t-start;
+            enabled: !root.running;
+            clicked => { root.start-backup(); }
+        }
+
+        Rectangle {
+            height: 18px;
+            background: #2d3742;
+            border-radius: 4px;
+            Rectangle {
+                x: 0; y: 0;
+                width: parent.width * root.progress;
+                height: parent.height;
+                background: #4ea1ff;
+                border-radius: 4px;
+            }
+        }
+        Text { text: root.status; }
+
+        ScrollView {
+            min-height: 200px;
+            Text { text: root.logtext; wrap: word-wrap; }
+        }
+    }
+}

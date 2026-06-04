@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Portable launcher – runs directly from the backup drive, no installation.
+# Double-clickable (on macOS copy it as a .command) or:  ./backuptool-portable [args]
+# With no arguments it starts the GUI, otherwise the command line.
+HERE="$(cd "$(dirname "$0")" && pwd)"
+export PYTHONPATH="$HERE:${PYTHONPATH:-}"
+PY="$(command -v python3 || command -v python)"
+if [ -z "$PY" ]; then
+  echo "Python 3 not found. Please install Python 3 (python.org / apt / brew)." >&2
+  exit 1
+fi
+exec "$PY" -m backuptool "$@"

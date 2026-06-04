@@ -1,0 +1,28 @@
+name: CI (Python)
+
+on:
+  push:
+    paths: ["python/**", ".github/workflows/python-ci.yml"]
+  pull_request:
+    paths: ["python/**", ".github/workflows/python-ci.yml"]
+
+defaults:
+  run:
+    working-directory: python
+
+jobs:
+  test:
+    name: test ${{ matrix.os }} / py${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run unit tests (core only, no GUI deps)
+        run: python -m unittest discover -s tests -v

@@ -1,0 +1,55 @@
+[package]
+name = "backuptool"
+version = "1.0.0"
+edition = "2021"
+description = "Parallel, incremental backup tool with selectable encryption (Rust)"
+authors = ["Houshang Pezeshkpour <houshang@pezeshkpour.eu>"]
+repository = "https://github.com/Houshang78/BackupTool"
+publish = false
+license = "GPL-3.0-or-later"
+default-run = "backuptool"
+
+[features]
+# GUI is optional so the core/CLI builds without Slint.
+gui = ["dep:slint", "dep:slint-build", "dep:rfd"]
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+rayon = "1.8"
+walkdir = "2"
+globset = "0.4"
+blake3 = "1.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+argon2 = "0.5"
+aes-gcm = "0.10"
+chacha20poly1305 = "0.10"
+rand = "0.8"
+rpassword = "7"
+indicatif = "0.17"
+filetime = "0.2"
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+gethostname = "0.4"
+
+# only with --features gui
+slint = { version = "1.5", optional = true }
+rfd = { version = "0.14", optional = true }
+
+[build-dependencies]
+slint-build = { version = "1.5", optional = true }
+
+[[bin]]
+name = "backuptool"
+path = "src/bin/backuptool.rs"
+
+[[bin]]
+name = "backuptool-gui"
+path = "src/bin/gui.rs"
+required-features = ["gui"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "backuptool"
+version = "1.0.0"
+description = "Cross-platform, parallel, incremental backup tool (Linux/macOS/Windows) with a Qt6 GUI"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "GPL-3.0-or-later" }
+authors = [{ name = "Houshang Pezeshkpour", email = "houshang@pezeshkpour.eu" }]
+maintainers = [{ name = "Atie", email = "houshang@pezeshkpour.eu" }]
+# The core only needs the standard library. The GUI uses Qt6 (PySide6).
+dependencies = ["PySide6>=6.5"]
+
+[project.optional-dependencies]
+# If you only want the command line, you don't need Qt:
+cli = []
+
+[project.urls]
+Homepage = "https://github.com/Houshang78/BackupTool"
+Repository = "https://github.com/Houshang78/BackupTool"
+
+[project.scripts]
+backuptool = "backuptool.cli:main"
+backuptool-gui = "backuptool.gui:main"
+
+[tool.setuptools]
+packages = ["backuptool"]
+
+[tool.setuptools.package-data]
+backuptool = ["lang/*.json"]

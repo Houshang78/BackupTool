@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>backuptool – Guide (EN / DE / FA)</title>
+<style>
+  :root{--bg:#0f1419;--panel:#1a2029;--panel2:#232b36;--text:#e6edf3;--muted:#9aa7b4;
+    --accent:#4ea1ff;--green:#3fb950;--amber:#f0a500;--red:#f85149;--code-bg:#0b0f14;--border:#2d3742;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Vazirmatn",Tahoma,sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.7;font-size:16px;}
+  .wrap{max-width:920px;margin:0 auto;padding:24px 20px 80px}
+  header{border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:24px}
+  h1{font-size:1.9rem;margin:0}
+  h2{font-size:1.4rem;margin:36px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--accent);color:#fff}
+  h3{font-size:1.1rem;color:var(--accent);margin:20px 0 8px}
+  code{background:var(--code-bg);padding:2px 6px;border-radius:4px;font-family:Menlo,Consolas,monospace;font-size:.86em;color:#ffd596}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow-x:auto}
+  pre code{color:#d4dce4;background:none;padding:0;font-size:.84rem}
+  .switch{position:sticky;top:0;background:var(--bg);padding:10px 0;display:flex;gap:8px;border-bottom:1px solid var(--border);z-index:5}
+  .switch button{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:20px;padding:6px 16px;cursor:pointer;font-size:.9rem}
+  .switch button.active{background:var(--accent);color:#001;font-weight:600;border-color:var(--accent)}
+  .callout{border-left:4px solid var(--accent);background:var(--panel);border-radius:8px;padding:12px 16px;margin:16px 0}
+  .tip{border-color:var(--green);background:#0f2417}
+  .warn{border-color:var(--amber);background:#2a2310}
+  table{width:100%;border-collapse:collapse;margin:14px 0;background:var(--panel);border-radius:8px;overflow:hidden;font-size:.92rem}
+  th,td{padding:9px 12px;border-bottom:1px solid var(--border);text-align:start}
+  th{background:var(--panel2);color:#fff}
+  html[dir="rtl"] pre, html[dir="rtl"] code{direction:ltr;text-align:left;unicode-bidi:embed}
+  .muted{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="switch">
+    <button id="b-en" onclick="setLang('en')">English</button>
+    <button id="b-de" onclick="setLang('de')">Deutsch</button>
+    <button id="b-fa" onclick="setLang('fa')">فارسی</button>
+  </div>
+
+  <!-- ========================= ENGLISH ========================= -->
+  <div data-lang="en">
+    <header><h1>backuptool — User Guide</h1>
+      <p class="muted">Cross-platform, parallel, incremental backup tool with a native GUI, selectable encryption, and per-system backup sets. Two independent implementations: <strong>Python (Qt6)</strong> and <strong>Rust (Slint)</strong>.</p>
+    </header>
+
+    <h2>1. Two implementations</h2>
+    <p>Pick whichever you prefer — both share the same manifest format and concepts.</p>
+    <table>
+      <tr><th>Variant</th><th>GUI</th><th>Build / run</th></tr>
+      <tr><td>Python</td><td>Qt6 (PySide6)</td><td><code>./backuptool-portable</code> or <code>pip install .</code></td></tr>
+      <tr><td>Rust</td><td>Slint (native)</td><td><code>cargo build --release</code></td></tr>
+    </table>
+
+    <h2>2. Install</h2>
+    <h3>Linux</h3>
+    <pre><code># Python:  bash packaging/build-deb.sh && sudo apt install ./dist/backuptool_1.0.0_all.deb
+# Rust:    cargo build --release   (GUI: cargo build --release --features gui)</code></pre>
+    <h3>macOS</h3>
+    <pre><code># Python:  bash packaging/build-macos.sh   (backuptool.app + .pkg)
+# Rust:    cargo build --release --features gui --bin backuptool-gui</code></pre>
+    <h3>Windows</h3>
+    <pre><code># Python:  powershell -File packaging\build-windows.ps1  ->  dist\backuptool.exe
+# Rust:    cargo build --release --features gui</code></pre>
+    <div class="callout">The Python GUI needs <code>pip install PySide6</code>. The CLI runs without it. The Rust binary is self-contained.</div>
+
+    <h2>3. Graphical interface</h2>
+    <p>The window has a <strong>language selector</strong> (English / Deutsch / فارسی; drop a <code>lang/&lt;code&gt;.json</code> file to add more). Choose sources, the destination / backup drive, the set name, worker count, the checksum compare, and the <strong>encryption</strong> from a dropdown. Progress and a log are shown live.</p>
+
+    <h2>4. Command line</h2>
+    <pre><code>backuptool backup ~/ -d /Volumes/Backup -s my-laptop --progress
+backuptool backup ~/ -d /Volumes/Backup -c -j 8        # BLAKE3/SHA compare, 8 workers
+backuptool backup ~/ -d /Volumes/Backup --cipher aes256gcm
+backuptool list    -d /Volumes/Backup
+backuptool restore -S /Volumes/Backup -s my-laptop -t /</code></pre>
+
+    <h2>5. Incremental compare</h2>
+    <p>Each set has a manifest. By default a file is “changed” when <strong>size or mtime</strong> differ; with <code>-c</code> when the <strong>checksum</strong> (SHA-256 / BLAKE3) differs. Only changed files are copied.</p>
+
+    <h2>6. Backup sets (multiple systems)</h2>
+    <p>With <code>-s NAME</code> each machine gets its own subfolder + manifest in the same destination, so you can back up several systems to one drive.</p>
+
+    <h2>7. Encryption</h2>
+    <p>Selectable: <code>none</code>, <strong>AES-256-GCM</strong>, or <strong>ChaCha20-Poly1305</strong>. The key is derived from a password with Argon2id (random salt per set). File contents are stored as ciphertext; the manifest stays readable (paths/metadata only).</p>
+
+    <h2>8. exFAT &amp; permissions</h2>
+    <p>exFAT cannot store Unix permissions, yet metadata (mode, owner, mtime) live in the manifest and are <strong>reapplied on restore</strong>. So an exFAT drive works everywhere (Linux/macOS/Windows) without losing rights.</p>
+
+    <h2>9. Restore</h2>
+    <pre><code>backuptool restore -S /Volumes/Backup -s my-laptop -t /tmp/test -n   # dry run first
+sudo backuptool restore -S /Volumes/Backup -s my-laptop -t /         # uid/gid needs root</code></pre>
+    <div class="callout warn">Target <code>/</code> modifies the running system — always dry-run (<code>-n</code>) first.</div>
+
+    <h2>License</h2>
+    <p>GNU GPL v3.0 or later. © Houshang Pezeshkpour (Atie). <span class="muted">github.com/Houshang78/BackupTool</span></p>
+  </div>
+
+  <!-- ========================= DEUTSCH ========================= -->
+  <div data-lang="de" style="display:none">
+    <header><h1>backuptool — Bedienungsanleitung</h1>
+      <p class="muted">Plattformübergreifendes, paralleles, inkrementelles Backup-Tool mit nativer GUI, wählbarer Verschlüsselung und Backup-Sets je System. Zwei unabhängige Umsetzungen: <strong>Python (Qt6)</strong> und <strong>Rust (Slint)</strong>.</p>
+    </header>
+
+    <h2>1. Zwei Umsetzungen</h2>
+    <p>Nimm, was dir lieber ist — beide teilen Manifest-Format und Konzepte.</p>
+    <table>
+      <tr><th>Variante</th><th>GUI</th><th>Bauen / Starten</th></tr>
+      <tr><td>Python</td><td>Qt6 (PySide6)</td><td><code>./backuptool-portable</code> oder <code>pip install .</code></td></tr>
+      <tr><td>Rust</td><td>Slint (nativ)</td><td><code>cargo build --release</code></td></tr>
+    </table>
+
+    <h2>2. Installation</h2>
+    <h3>Linux</h3>
+    <pre><code># Python:  bash packaging/build-deb.sh && sudo apt install ./dist/backuptool_1.0.0_all.deb
+# Rust:    cargo build --release   (GUI: cargo build --release --features gui)</code></pre>
+    <h3>macOS</h3>
+    <pre><code># Python:  bash packaging/build-macos.sh   (backuptool.app + .pkg)
+# Rust:    cargo build --release --features gui --bin backuptool-gui</code></pre>
+    <h3>Windows</h3>
+    <pre><code># Python:  powershell -File packaging\build-windows.ps1  ->  dist\backuptool.exe
+# Rust:    cargo build --release --features gui</code></pre>
+    <div class="callout">Die Python-GUI braucht <code>pip install PySide6</code>. Die Kommandozeile läuft ohne. Die Rust-Binary ist eigenständig.</div>
+
+    <h2>3. Grafische Oberfläche</h2>
+    <p>Das Fenster hat eine <strong>Sprachauswahl</strong> (English / Deutsch / فارسی; weitere Sprache per <code>lang/&lt;code&gt;.json</code> ergänzbar). Wähle Quellen, Ziel/Sicherungsplatte, Set-Namen, Worker-Zahl, den Prüfsummen-Abgleich und die <strong>Verschlüsselung</strong> per Dropdown. Fortschritt und Log laufen live.</p>
+
+    <h2>4. Kommandozeile</h2>
+    <pre><code>backuptool backup ~/ -d /Volumes/Backup -s mein-laptop --progress
+backuptool backup ~/ -d /Volumes/Backup -c -j 8        # Prüfsummen-Abgleich, 8 Worker
+backuptool backup ~/ -d /Volumes/Backup --cipher aes256gcm
+backuptool list    -d /Volumes/Backup
+backuptool restore -S /Volumes/Backup -s mein-laptop -t /</code></pre>
+
+    <h2>5. Inkrementeller Abgleich</h2>
+    <p>Jedes Set hat ein Manifest. Standardmäßig gilt eine Datei als „geändert", wenn <strong>Größe oder mtime</strong> abweichen; mit <code>-c</code>, wenn die <strong>Prüfsumme</strong> (SHA-256 / BLAKE3) abweicht. Nur Geändertes wird kopiert.</p>
+
+    <h2>6. Backup-Sets (mehrere Systeme)</h2>
+    <p>Mit <code>-s NAME</code> bekommt jedes System einen eigenen Unterordner + Manifest im selben Ziel — so sicherst du mehrere Rechner auf eine Platte.</p>
+
+    <h2>7. Verschlüsselung</h2>
+    <p>Wählbar: <code>none</code>, <strong>AES-256-GCM</strong> oder <strong>ChaCha20-Poly1305</strong>. Der Schlüssel wird per Argon2id aus dem Passwort abgeleitet (zufälliges Salt je Set). Dateiinhalte liegen als Chiffrat vor; das Manifest bleibt lesbar (nur Pfade/Metadaten).</p>
+
+    <h2>8. exFAT &amp; Rechte</h2>
+    <p>exFAT speichert keine Unix-Rechte, doch die Metadaten (Modus, Eigentümer, mtime) stehen im Manifest und werden beim <strong>Restore wieder gesetzt</strong>. So funktioniert eine exFAT-Platte überall (Linux/macOS/Windows), ohne Rechte zu verlieren.</p>
+
+    <h2>9. Wiederherstellen</h2>
+    <pre><code>backuptool restore -S /Volumes/Backup -s mein-laptop -t /tmp/test -n   # erst Probelauf
+sudo backuptool restore -S /Volumes/Backup -s mein-laptop -t /         # uid/gid nur als root</code></pre>
+    <div class="callout warn">Ziel <code>/</code> verändert das laufende System — immer zuerst Probelauf (<code>-n</code>).</div>
+
+    <h2>Lizenz</h2>
+    <p>GNU GPL v3.0 oder später. © Houshang Pezeshkpour (Atie). <span class="muted">github.com/Houshang78/BackupTool</span></p>
+  </div>
+
+  <!-- ========================= فارسی ========================= -->
+  <div data-lang="fa" style="display:none">
+    <header><h1>backuptool — راهنمای کاربری</h1>
+      <p class="muted">ابزار پشتیبان‌گیری چندسکویی، موازی و افزایشی با رابط گرافیکی بومی، رمزنگاری قابل‌انتخاب و مجموعه‌های پشتیبان مجزا برای هر سیستم. دو پیاده‌سازی مستقل: <strong>پایتون (Qt6)</strong> و <strong>راست (Slint)</strong>.</p>
+    </header>
+
+    <h2>۱. دو پیاده‌سازی</h2>
+    <p>هرکدام را که می‌پسندید انتخاب کنید — هر دو قالب مانیفست و مفاهیم یکسانی دارند.</p>
+    <table>
+      <tr><th>نسخه</th><th>رابط گرافیکی</th><th>ساخت / اجرا</th></tr>
+      <tr><td>پایتون</td><td>Qt6 (PySide6)</td><td><code>./backuptool-portable</code> یا <code>pip install .</code></td></tr>
+      <tr><td>راست</td><td>Slint (بومی)</td><td><code>cargo build --release</code></td></tr>
+    </table>
+
+    <h2>۲. نصب</h2>
+    <h3>لینوکس</h3>
+    <pre><code># پایتون:  bash packaging/build-deb.sh && sudo apt install ./dist/backuptool_1.0.0_all.deb
+# راست:    cargo build --release   (رابط گرافیکی: cargo build --release --features gui)</code></pre>
+    <h3>مک</h3>
+    <pre><code># پایتون:  bash packaging/build-macos.sh   (backuptool.app + .pkg)
+# راست:    cargo build --release --features gui --bin backuptool-gui</code></pre>
+    <h3>ویندوز</h3>
+    <pre><code># پایتون:  powershell -File packaging\build-windows.ps1  ->  dist\backuptool.exe
+# راست:    cargo build --release --features gui</code></pre>
+    <div class="callout">رابط گرافیکی پایتون به <code>pip install PySide6</code> نیاز دارد. خط فرمان بدون آن کار می‌کند. باینری راست مستقل است.</div>
+
+    <h2>۳. رابط گرافیکی</h2>
+    <p>پنجره یک <strong>انتخاب‌گر زبان</strong> دارد (English / Deutsch / فارسی؛ برای افزودن زبان، فایل <code>lang/&lt;code&gt;.json</code> را قرار دهید). منابع، مقصد/دیسک پشتیبان، نام مجموعه، تعداد کارگرها، مقایسهٔ چک‌سام و <strong>رمزنگاری</strong> را از فهرست کشویی انتخاب کنید. پیشرفت و گزارش به‌صورت زنده نمایش داده می‌شوند.</p>
+
+    <h2>۴. خط فرمان</h2>
+    <pre><code>backuptool backup ~/ -d /Volumes/Backup -s my-laptop --progress
+backuptool backup ~/ -d /Volumes/Backup -c -j 8        # مقایسهٔ چک‌سام، ۸ کارگر
+backuptool backup ~/ -d /Volumes/Backup --cipher aes256gcm
+backuptool list    -d /Volumes/Backup
+backuptool restore -S /Volumes/Backup -s my-laptop -t /</code></pre>
+
+    <h2>۵. مقایسهٔ افزایشی</h2>
+    <p>هر مجموعه یک مانیفست دارد. به‌طور پیش‌فرض یک فایل وقتی «تغییر‌یافته» است که <strong>اندازه یا زمان تغییر</strong> فرق کند؛ با <code>-c</code> وقتی <strong>چک‌سام</strong> (SHA-256 / BLAKE3) فرق کند. فقط موارد تغییر‌یافته کپی می‌شوند.</p>
+
+    <h2>۶. مجموعه‌های پشتیبان (چند سیستم)</h2>
+    <p>با <code>-s NAME</code> هر دستگاه پوشه و مانیفست مخصوص خود را در همان مقصد می‌گیرد — پس می‌توانید چند سیستم را روی یک دیسک پشتیبان بگیرید.</p>
+
+    <h2>۷. رمزنگاری</h2>
+    <p>قابل‌انتخاب: <code>none</code>، <strong>AES-256-GCM</strong> یا <strong>ChaCha20-Poly1305</strong>. کلید با Argon2id از گذرواژه ساخته می‌شود (نمک تصادفی برای هر مجموعه). محتوای فایل‌ها به‌صورت رمزشده ذخیره می‌شود؛ مانیفست خوانا می‌ماند (فقط مسیرها/فراداده).</p>
+
+    <h2>۸. exFAT و مجوزها</h2>
+    <p>exFAT نمی‌تواند مجوزهای یونیکس را ذخیره کند، اما فراداده (حالت، مالک، زمان) در مانیفست است و هنگام <strong>بازگردانی دوباره اعمال می‌شود</strong>. بنابراین یک دیسک exFAT همه‌جا (لینوکس/مک/ویندوز) بدون از دست رفتن مجوزها کار می‌کند.</p>
+
+    <h2>۹. بازگردانی</h2>
+    <pre><code>backuptool restore -S /Volumes/Backup -s my-laptop -t /tmp/test -n   # ابتدا اجرای آزمایشی
+sudo backuptool restore -S /Volumes/Backup -s my-laptop -t /         # uid/gid نیازمند root</code></pre>
+    <div class="callout warn">مقصد <code>/</code> سیستم در حال اجرا را تغییر می‌دهد — همیشه ابتدا اجرای آزمایشی (<code>-n</code>).</div>
+
+    <h2>پروانه</h2>
+    <p>GNU GPL v3.0 یا بالاتر. © Houshang Pezeshkpour (Atie). <span class="muted">github.com/Houshang78/BackupTool</span></p>
+  </div>
+</div>
+
+<script>
+function setLang(l){
+  document.querySelectorAll('[data-lang]').forEach(function(e){
+    e.style.display = (e.getAttribute('data-lang') === l) ? '' : 'none';
+  });
+  document.documentElement.lang = l;
+  document.documentElement.dir = (l === 'fa') ? 'rtl' : 'ltr';
+  ['en','de','fa'].forEach(function(c){
+    document.getElementById('b-' + c).classList.toggle('active', c === l);
+  });
+}
+setLang('en');
+</script>
+</body>
+</html>
