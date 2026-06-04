@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Bump the project version everywhere (both implementations + packaging + docs).
-# Usage:  bash scripts/bump-version.sh 1.2.0
+# Usage:  bash scripts/bump-version.sh 1.2.1
 #
 # Replaces the exact current version string project-wide (except Cargo.lock and the
 # CHANGELOG history), refreshes Cargo.lock, and prepends a CHANGELOG stub.
 set -euo pipefail
 
 NEW="${1:-}"
-[ -n "$NEW" ] || { echo "Usage: $0 <new-version>   e.g. 1.2.0" >&2; exit 1; }
+[ -n "$NEW" ] || { echo "Usage: $0 <new-version>   e.g. 1.2.1" >&2; exit 1; }
 echo "$NEW" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' \
     || { echo "Version must be MAJOR.MINOR.PATCH" >&2; exit 1; }
 

@@ -1,6 +1,6 @@
 name: Release
 
-# Cut a release by pushing a tag:  git tag v1.2.0 && git push origin v1.2.0
+# Cut a release by pushing a tag:  git tag v1.2.1 && git push origin v1.2.1
 on:
   push:
     tags: ["v*"]
@@ -40,20 +40,21 @@ jobs:
           mkdir -p dist-rel
           cp target/release/backuptool target/release/backuptool-gui dist-rel/
           cp README.md LICENSE dist-rel/
-          tar -czf "backuptool-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" -C dist-rel .
+          tar -czf "backuptool-${{ github.ref_name }}-${{ matrix.name }}-rust.tar.gz" -C dist-rel .
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist-rel | Out-Null
           Copy-Item target\release\backuptool.exe, target\release\backuptool-gui.exe, README.md, LICENSE dist-rel\
-          Compress-Archive -Path dist-rel\* -DestinationPath "backuptool-${{ github.ref_name }}-${{ matrix.name }}.zip"
+          Compress-Archive -Path dist-rel\* -DestinationPath "backuptool-${{ github.ref_name }}-${{ matrix.name }}-rust.zip"
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            rust/backuptool-${{ github.ref_name }}-*.tar.gz
-            rust/backuptool-${{ github.ref_name }}-*.zip
+            rust/backuptool-${{ github.ref_name }}-*-rust.tar.gz
+            rust/backuptool-${{ github.ref_name }}-*-rust.zip
+          body_path: ${{ github.workspace }}/.github/release-notes.md
           fail_on_unmatched_files: false
 
   # ---- Python: native installers via the packaging scripts ----
@@ -79,7 +80,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           bash packaging/build-macos.sh
-          tar -czf "dist/backuptool-${{ github.ref_name }}-macos-app.tar.gz" -C dist backuptool.app
+          tar -czf "dist/backuptool-${{ github.ref_name }}-macos-app-python.tar.gz" -C dist backuptool.app
       - name: Build .exe (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -91,5 +92,6 @@ jobs:
             python/dist/*.deb
             python/dist/*.pkg
             python/dist/*.exe
-            python/dist/*macos-app.tar.gz
+            python/dist/*macos-app-python.tar.gz
+          body_path: ${{ github.workspace }}/.github/release-notes.md
           fail_on_unmatched_files: false

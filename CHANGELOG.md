@@ -2,7 +2,7 @@
 
 All notable changes to this project. Versions follow [Semantic Versioning](https://semver.org).
 
-## [Unreleased]
+## [1.2.1]
 ### Added
 - **Application icons** for all installers: a per-OS line-art logo (a save/backup
   floppy with the OS marker — Tux / Apple / Windows — laid where the upload arrow
@@ -11,6 +11,10 @@ All notable changes to this project. Versions follow [Semantic Versioning](https
   - Linux `.deb`: hicolor PNG set (16–512 px) + `Icon=backuptool` in the desktop entry.
   - Windows: multi-resolution `.ico` (Setup icon, shortcut icon, PyInstaller `--icon`).
   - macOS: `.icns` in the `.app` bundle (`CFBundleIconFile`).
+- **Clear variant choice in releases**: Rust archives are now suffixed `-rust`
+  and the GitHub release notes explain which file to grab for the **Rust**
+  (single binary, built-in encryption) vs **Python** (native installer, Qt GUI)
+  variant, per OS.
 
 ### Fixed
 - `.deb` was uninstallable where `python3-pyside6` is not in the apt repos: it
