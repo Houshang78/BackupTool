@@ -18,6 +18,8 @@ dependency-free binary, no Python/Qt required. Optional native **Slint** GUI.
   extensible via `lang/*.json`) and an encryption dropdown.
 
 ## Build & run
+Requires **Rust ≥ 1.78** (the committed `Cargo.lock` uses format v4). On an older
+toolchain run `rustup update stable`, or delete `Cargo.lock` to regenerate it.
 ```bash
 # toolchain (if needed):  https://rustup.rs
 cargo build --release                                   # core + CLI

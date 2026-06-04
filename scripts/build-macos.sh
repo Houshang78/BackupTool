@@ -10,7 +10,12 @@ mkdir -p "$OUT"
 
 echo "==> Rust (CLI + GUI, release)"
 cd "$ROOT/rust"
-cargo build --release --bin backuptool
+if ! cargo build --release --bin backuptool; then
+  echo "!! cargo build failed." >&2
+  echo "   If the error mentions 'lock file version 4', your Cargo is older than 1.78." >&2
+  echo "   Fix:  rustup update stable     (or: rm rust/Cargo.lock && retry)" >&2
+  exit 1
+fi
 cargo build --release --features gui --bin backuptool-gui
 cp -f target/release/backuptool "$OUT/" 2>/dev/null || true
 cp -f target/release/backuptool-gui "$OUT/" 2>/dev/null || true

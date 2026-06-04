@@ -10,7 +10,12 @@ mkdir -p "$OUT"
 
 echo "==> Rust (CLI + GUI, release)"
 cd "$ROOT/rust"
-cargo build --release --bin backuptool
+if ! cargo build --release --bin backuptool; then
+  echo "!! cargo build failed." >&2
+  echo "   If the error mentions 'lock file version 4', your Cargo is older than 1.78." >&2
+  echo "   Fix:  rustup update stable     (or: rm rust/Cargo.lock && retry)" >&2
+  exit 1
+fi
 if ! cargo build --release --features gui --bin backuptool-gui; then
   echo "!! GUI build failed. Install Slint deps:" >&2
   echo "   sudo apt install -y libfontconfig1-dev libxcb1-dev libxkbcommon-dev libwayland-dev" >&2
