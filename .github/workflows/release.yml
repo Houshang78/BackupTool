@@ -1,6 +1,6 @@
 name: Release
 
-# Cut a release by pushing a tag:  git tag v1.0.0 && git push origin v1.0.0
+# Cut a release by pushing a tag:  git tag v1.1.0 && git push origin v1.1.0
 on:
   push:
     tags: ["v*"]

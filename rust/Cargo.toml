@@ -1,6 +1,6 @@
 [package]
 name = "backuptool"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 rust-version = "1.78"   # Cargo.lock is v4; needs Cargo/rustc >= 1.78
 description = "Parallel, incremental backup tool with selectable encryption (Rust)"

@@ -66,7 +66,7 @@ pip install .                                   # نصب توسعه: backuptool,
 ### بسته‌های بومی
 ```bash
 cd python
-bash packaging/build-deb.sh                     # لینوکس  -> dist/backuptool_1.0.0_all.deb
+bash packaging/build-deb.sh                     # لینوکس  -> dist/backuptool_1.1.0_all.deb
 bash packaging/build-macos.sh                   # مک      -> dist/backuptool.app + .pkg
 powershell -File packaging\build-windows.ps1    # ویندوز  -> dist\backuptool.exe (PyInstaller)
 ```
@@ -80,8 +80,8 @@ powershell -File packaging\build-windows.ps1    # ویندوز  -> dist\backupto
 پوش‌کردن یک تگ، `.github/workflows/release.yml` را اجرا می‌کند، همان آرتیفکت‌ها را
 روی رانرهای لینوکس/مک/ویندوزِ گیت‌هاب می‌سازد و به Release می‌چسباند:
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.1.0
+git push origin v1.1.0
 ```
 پیش از ساختِ بسته‌های خودتان: نویسنده/ناشر و شناسهٔ بستهٔ مک را در
 `python/pyproject.toml`، `python/packaging/*` و `rust/Cargo.toml` تغییر دهید.

@@ -17,7 +17,7 @@
 ./rust/target/release/backuptool --help
 ./rust/target/release/backuptool-gui            # رابط گرافیکی بومی
 # از یک آرشیو Release
-tar -xzf backuptool-v1.0.0-linux-x86_64.tar.gz  # یا unzip فایل .zip ویندوز
+tar -xzf backuptool-v1.1.0-linux-x86_64.tar.gz  # یا unzip فایل .zip ویندوز
 ./backuptool --help
 ./backuptool-gui
 ```
@@ -42,7 +42,7 @@ cd python
 
 ### لینوکس (.deb)
 ```bash
-sudo apt install ./backuptool_1.0.0_all.deb
+sudo apt install ./backuptool_1.1.0_all.deb
 backuptool --help          # CLI
 backuptool gui             # GUI (یا ورودی منوی «backuptool»)
 ```
@@ -51,7 +51,7 @@ backuptool gui             # GUI (یا ورودی منوی «backuptool»)
 
 ### مک (.pkg یا .app)
 ```bash
-sudo installer -pkg backuptool-1.0.0.pkg -target /     # CLI در /usr/local/bin
+sudo installer -pkg backuptool-1.1.0.pkg -target /     # CLI در /usr/local/bin
 backuptool --help
 ```
 یا روی `backuptool.app` دابل‌کلیک کنید (GUI). در هر دو حالت یک‌بار:
@@ -60,7 +60,7 @@ backuptool --help
 
 ### ویندوز (.exe / Setup)
 - پرتابل: کافی است `backuptool.exe` را نگه دارید و اجرا کنید.
-- نصب‌کننده: `backuptool-setup-1.0.0.exe` (Inno Setup) را اجرا کنید — ورودیِ منوی
+- نصب‌کننده: `backuptool-setup-1.1.0.exe` (Inno Setup) را اجرا کنید — ورودیِ منوی
   استارت، آیکن دسکتاپِ اختیاری و افزودنِ اختیاری CLI به `PATH`. حذف از
   *Settings → Apps*.
 
