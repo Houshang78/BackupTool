@@ -2,6 +2,13 @@
 
 All notable changes to this project. Versions follow [Semantic Versioning](https://semver.org).
 
+## [1.2.2]
+### Fixed
+- Linux Rust binaries failed on older systems with
+  `version 'GLIBC_2.39' not found`: the release built them on `ubuntu-latest`
+  (24.04, glibc 2.39). They are now built on **Ubuntu 22.04 (glibc 2.35)**, so
+  the dynamically linked binaries run on glibc ≥ 2.35 (Ubuntu 22.04+, Debian 12+).
+
 ## [1.2.1]
 ### Added
 - **Application icons** for all installers: a per-OS line-art logo (a save/backup

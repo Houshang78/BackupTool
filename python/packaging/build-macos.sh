@@ -4,7 +4,7 @@
 # Result:  dist/backuptool.app  and  dist/backuptool-<version>.pkg
 set -euo pipefail
 
-VERSION="1.2.1"
+VERSION="1.2.2"
 IDENT="eu.pezeshkpour.backuptool"   # bundle identifier (Atie / Houshang Pezeshkpour)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/dist"

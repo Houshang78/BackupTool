@@ -3,7 +3,7 @@
 ; Prerequisite: dist\backuptool.exe was built beforehand with build-windows.ps1.
 
 #define MyAppName "backuptool"
-#define MyAppVersion "1.2.1"
+#define MyAppVersion "1.2.2"
 #define MyAppPublisher "Atie"
 #define MyAppAuthor "Houshang Pezeshkpour"
 #define MyAppContact "houshang@pezeshkpour.eu"

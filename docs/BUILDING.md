@@ -74,7 +74,7 @@ pip install .                                   # dev install: backuptool, backu
 ### Native packages
 ```bash
 cd python
-bash packaging/build-deb.sh                     # Linux  -> dist/backuptool_1.2.1_all.deb
+bash packaging/build-deb.sh                     # Linux  -> dist/backuptool_1.2.2_all.deb
 bash packaging/build-macos.sh                   # macOS  -> dist/backuptool.app + .pkg
 powershell -File packaging\build-windows.ps1    # Windows -> dist\backuptool.exe (PyInstaller)
 ```
@@ -88,9 +88,9 @@ via `pip3 install PySide6`). The Windows `.exe` bundles PySide6.
 Pushing a tag runs `.github/workflows/release.yml`, which builds the same artifacts
 on GitHub-hosted Linux/macOS/Windows runners and attaches them to the GitHub Release:
 ```bash
-bash scripts/bump-version.sh 1.2.1     # bump version everywhere + CHANGELOG stub
-git commit -am "Bump version to 1.2.1"
-git tag -a v1.2.1 -m "backuptool v1.2.1"
+bash scripts/bump-version.sh 1.2.2     # bump version everywhere + CHANGELOG stub
+git commit -am "Bump version to 1.2.2"
+git tag -a v1.2.2 -m "backuptool v1.2.2"
 git push --follow-tags                 # triggers the Release workflow
 ```
 
