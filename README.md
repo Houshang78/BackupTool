@@ -15,7 +15,10 @@ from exFAT). The UI is available in **English, German and Persian (فارسی)**
 extensible by dropping a `lang/<code>.json` file.
 
 ## Quick links
-- 📖 Trilingual guide (EN / DE / FA): [`docs/backuptool-guide.html`](docs/backuptool-guide.html)
+- 🔧 Building: [`docs/BUILDING.md`](docs/BUILDING.md)
+- 📦 Install / run without install: [`docs/INSTALL.md`](docs/INSTALL.md)
+- 📚 Usage (paths, excludes, encryption, restore): [`docs/USAGE.md`](docs/USAGE.md)
+- 📖 Trilingual quick guide (EN / DE / FA): [`docs/backuptool-guide.html`](docs/backuptool-guide.html)
 - 🐍 Python implementation: [`python/README.md`](python/README.md)
 - 🦀 Rust implementation: [`rust/README.md`](rust/README.md)
 
