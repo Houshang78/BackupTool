@@ -31,6 +31,17 @@ cargo run --release --features gui --bin backuptool-gui
 cargo test
 ```
 
+### Build everything for your OS (one command)
+Convenience wrappers that build the Rust binaries **and** the Python package and
+collect all artifacts into `dist/<os>/`:
+```bash
+bash   scripts/build-linux.sh        # Rust CLI+GUI + .deb
+bash   scripts/build-macos.sh        # Rust CLI+GUI + .app + .pkg
+powershell -File scripts/build-windows.ps1   # Rust CLI+GUI + .exe
+```
+For published downloads, pushing a tag runs the **Release** workflow (see below),
+which builds the same artifacts on GitHub-hosted runners.
+
 ## Releases
 Pushing a tag builds and publishes binaries/installers for Linux, macOS and Windows
 (Rust CLI + GUI archives, plus `.deb` / `.pkg` / `.exe`) via GitHub Actions:
