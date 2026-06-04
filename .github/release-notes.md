@@ -22,6 +22,6 @@ PySide6 (`pip install PySide6`, or it is pulled in automatically where packaged)
 |----|------|
 | Linux (Debian/Ubuntu) | `backuptool_<ver>_all.deb` |
 | macOS | `backuptool-<ver>.pkg` (CLI) · `backuptool-<tag>-macos-app-python.tar.gz` (.app GUI) |
-| Windows | `backuptool-setup-<ver>.exe` |
+| Windows | `backuptool.exe` (portable single-file; build the Inno Setup installer yourself with `ISCC` if you want one) |
 
 See `CHANGELOG.md` for what changed in this release.
