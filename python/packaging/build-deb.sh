@@ -29,6 +29,14 @@ chmod 755 "$BUILD/usr/bin/backuptool"
 install -d "$BUILD/usr/share/applications"
 cp "$ROOT/packaging/backuptool.desktop" "$BUILD/usr/share/applications/"
 
+# Application icon (hicolor theme, referenced by Icon=backuptool in the .desktop)
+for size in 16 32 48 64 128 256 512; do
+  src="$ROOT/packaging/icons/hicolor/${size}x${size}/apps/backuptool.png"
+  [ -f "$src" ] || continue
+  install -d "$BUILD/usr/share/icons/hicolor/${size}x${size}/apps"
+  install -m 644 "$src" "$BUILD/usr/share/icons/hicolor/${size}x${size}/apps/backuptool.png"
+done
+
 # --- control file ---
 install -d "$BUILD/DEBIAN"
 cat > "$BUILD/DEBIAN/control" <<EOF

@@ -15,6 +15,7 @@ Write-Host "==> PyInstaller building backuptool.exe ..."
 # --onefile: a single portable .exe ; --console: CLI works, GUI starts with no arguments.
 # PyInstaller ships its own PySide6 hooks (Qt plugins are bundled).
 pyinstaller --noconfirm --onefile --console --name backuptool `
+  --icon packaging/win/backuptool.ico `
   --collect-submodules PySide6 `
   --add-data "backuptool/lang;backuptool/lang" `
   run.py

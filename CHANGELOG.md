@@ -2,6 +2,16 @@
 
 All notable changes to this project. Versions follow [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+### Added
+- **Application icons** for all installers: a per-OS line-art logo (a save/backup
+  floppy with the OS marker — Tux / Apple / Windows — laid where the upload arrow
+  points). Sources and a reproducible generator live in `assets/logos/`
+  (`make-logos.py`). Wired into packaging:
+  - Linux `.deb`: hicolor PNG set (16–512 px) + `Icon=backuptool` in the desktop entry.
+  - Windows: multi-resolution `.ico` (Setup icon, shortcut icon, PyInstaller `--icon`).
+  - macOS: `.icns` in the `.app` bundle (`CFBundleIconFile`).
+
 ## [1.2.0]
 ### Added
 - **Directory tracking** (both implementations): directories are now recorded in

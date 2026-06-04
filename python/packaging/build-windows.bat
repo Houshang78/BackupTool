@@ -9,7 +9,7 @@ python -m pip install --upgrade pip || goto :err
 python -m pip install pyinstaller PySide6 || goto :err
 
 echo ==> PyInstaller building backuptool.exe ...
-pyinstaller --noconfirm --onefile --console --name backuptool --collect-submodules PySide6 --add-data "backuptool/lang;backuptool/lang" run.py || goto :err
+pyinstaller --noconfirm --onefile --console --name backuptool --icon packaging\win\backuptool.ico --collect-submodules PySide6 --add-data "backuptool/lang;backuptool/lang" run.py || goto :err
 
 echo.
 echo Done: dist\backuptool.exe

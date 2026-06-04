@@ -29,9 +29,15 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>backuptool</string>
+  <key>CFBundleIconFile</key><string>backuptool</string>
   <key>LSMinimumSystemVersion</key><string>11.0</string>
 </dict></plist>
 EOF
+
+# Application icon
+if [ -f "$ROOT/packaging/backuptool.icns" ]; then
+  cp "$ROOT/packaging/backuptool.icns" "$APP/Contents/Resources/backuptool.icns"
+fi
 
 cat > "$APP/Contents/MacOS/backuptool" <<'EOF'
 #!/bin/bash

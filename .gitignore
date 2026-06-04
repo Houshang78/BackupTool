@@ -219,3 +219,4 @@ __marimo__/
 
 # Local macOS cruft
 .DS_Store
+._*
