@@ -62,11 +62,33 @@ def load(name):
     return autocrop(key_white(Image.open(os.path.join(HERE, name))))
 
 
+def squircle(C=1024, margin=40, radius=210, top=(255, 255, 255), bot=(231, 236, 242)):
+    """A light rounded-square app-icon plate (subtle vertical gradient + hairline
+    border) so the dark line art stays visible on dark docks/taskbars."""
+    col = Image.new("RGB", (1, C))
+    for y in range(C):
+        t = y / (C - 1)
+        col.putpixel((0, y), tuple(int(top[i] * (1 - t) + bot[i] * t) for i in range(3)))
+    grad = col.resize((C, C))
+    mask = Image.new("L", (C, C), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((margin, margin, C - margin, C - margin),
+                                           radius=radius, fill=255)
+    plate = Image.new("RGBA", (C, C), (0, 0, 0, 0))
+    plate.paste(grad, (0, 0), mask)
+    border = Image.new("RGBA", (C, C), (0, 0, 0, 0))
+    ImageDraw.Draw(border).rounded_rectangle((margin, margin, C - margin, C - margin),
+                                             radius=radius, outline=(45, 55, 66, 45), width=3)
+    plate.alpha_composite(border)
+    return plate
+
+
 def compose(marker_file):
-    """backup floppy as the base; OS marker laid onto the label, where the arrow points."""
+    """Light squircle plate; backup floppy as the base; OS marker laid onto the
+    label, where the arrow points."""
     C = 1024
-    cv = Image.new("RGBA", (C, C), (0, 0, 0, 0))
-    bk = scale_w(load("backup.png"), 880)
+    plate = squircle(C)
+    cv = plate.copy()
+    bk = scale_w(load("backup.png"), 600)   # leaves padding inside the squircle
     px, py = (C - bk.size[0]) // 2, (C - bk.size[1]) // 2
     cv.alpha_composite(bk, (px, py))
     bw, bh = bk.size
@@ -78,7 +100,7 @@ def compose(marker_file):
     mask = Image.new("L", (C, C), 0)
     ImageDraw.Draw(mask).rounded_rectangle(
         (lx - pad, ly - pad, lx + lw + pad, ly + lh + pad), radius=22, fill=255)
-    cv.paste((0, 0, 0, 0), (0, 0), mask)   # erase floppy lines under the marker
+    cv.paste(plate, (0, 0), mask)   # restore clean plate under the marker (hide floppy lines)
     cv.alpha_composite(logo, (lx, ly))
     return cv
 
