@@ -1,5 +1,7 @@
 # Building
 
+**Languages:** English · [Deutsch](BUILDING.de.md) · [فارسی](BUILDING.fa.md)
+
 How to build each variant on each OS. Every package is built **on its own platform**
 — PyInstaller, dpkg and pkgbuild do not cross-compile, and Rust binaries are native
 per OS/architecture.

@@ -1,5 +1,7 @@
 # Installing & Running
 
+**Languages:** English · [Deutsch](INSTALL.de.md) · [فارسی](INSTALL.fa.md)
+
 Two ways to use the tool: **run without installing** (portable) or **install** a
 native package. After that, see [USAGE.md](USAGE.md) for how to take backups.
 

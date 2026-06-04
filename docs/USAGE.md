@@ -1,5 +1,7 @@
 # Usage Guide
 
+**Languages:** English · [Deutsch](USAGE.de.md) · [فارسی](USAGE.fa.md)
+
 How to take backups in every supported way — choosing paths, excluding
 directories, with or without encryption, incremental compares, and restoring.
 Applies to both implementations; **differences between Python and Rust are
