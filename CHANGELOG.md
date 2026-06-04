@@ -12,6 +12,12 @@ All notable changes to this project. Versions follow [Semantic Versioning](https
   - Windows: multi-resolution `.ico` (Setup icon, shortcut icon, PyInstaller `--icon`).
   - macOS: `.icns` in the `.app` bundle (`CFBundleIconFile`).
 
+### Fixed
+- `.deb` was uninstallable where `python3-pyside6` is not in the apt repos: it
+  was a hard `Depends`. PySide6 is only needed for the GUI, so it is now a
+  `Recommends` (auto-installed where available, skipped otherwise) and the only
+  hard dependency is `python3`. The CLI works with the standard library alone.
+
 ## [1.2.0]
 ### Added
 - **Directory tracking** (both implementations): directories are now recorded in

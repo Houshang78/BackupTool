@@ -45,8 +45,8 @@ Version: $VERSION
 Section: utils
 Priority: optional
 Architecture: all
-Depends: python3 (>= 3.8), python3-pyside6.qtwidgets | python3-pyside6
-Recommends: rsync
+Depends: python3 (>= 3.8)
+Recommends: python3-pyside6.qtwidgets | python3-pyside6, rsync
 Maintainer: Houshang Pezeshkpour (Atie) <houshang@pezeshkpour.eu>
 Description: Cross-platform parallel incremental backup tool
  Backs up user data in parallel (multicore) and incrementally (mtime/size or
