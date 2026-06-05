@@ -46,6 +46,20 @@ def cmd_list(a):
         print(f"{s['set']:24} {s['host']:16} {s['created']:20} {s['files']}")
 
 
+def cmd_discover(a):
+    from . import discover as dsc
+    print("Sources (auto-detected):")
+    for c in dsc.user_data_sources():
+        print(f"  {c['kind']:8} {c['path']}")
+    print("Destinations (removable / network):")
+    dests = dsc.detect_destinations()
+    if not dests:
+        print("  (none mounted)")
+    for c in dests:
+        print(f"  {c['kind']:8} {c['path']}")
+    print("Suggested destination:", dsc.default_destination() or "(none)")
+
+
 def _progress(done, total, path):
     pct = (done / total * 100) if total else 100
     sys.stdout.write(f"\r  {done}/{total} ({pct:5.1f}%) {path[:60]:60}")
@@ -93,6 +107,9 @@ def build_parser():
     li = sub.add_parser("list", help="list backup sets")
     li.add_argument("-d", "--dest", required=True, help="destination folder")
     li.set_defaults(func=cmd_list)
+
+    sub.add_parser("discover", help="list auto-detected sources and destinations") \
+       .set_defaults(func=cmd_discover)
 
     g = sub.add_parser("gui", help="launch the graphical interface")
     g.set_defaults(func=lambda a: _launch_gui())

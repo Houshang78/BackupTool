@@ -7,6 +7,7 @@
   "add_folder": "Folder +",
   "add_file": "File +",
   "remove": "Remove",
+  "auto_sources": "Auto",
   "dest": "Destination / backup drive:",
   "choose": "Choose",
   "set_name": "Backup set (name):",

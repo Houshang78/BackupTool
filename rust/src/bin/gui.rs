@@ -88,6 +88,7 @@ fn apply_language(ui: &MainWindow, i18n: &I18n, code: &str, is_root: bool) {
     ui.set_t_tab_backup(t("tab_backup").into());
     ui.set_t_sources(t("sources").into());
     ui.set_t_pick(t("choose").into());
+    ui.set_t_auto(t("auto_sources").into());
     ui.set_t_dest(t("dest").into());
     ui.set_t_set(t("set_name").into());
     ui.set_t_workers(t("workers").into());
@@ -127,6 +128,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     apply_language(&ui, &i18n, &current.borrow(), is_root);
 
     ui.set_setname(gethostname::gethostname().to_string_lossy().into_owned().into());
+    if let Some(d) = backuptool::discover::default_destination() {
+        ui.set_dest(d.into());   // USB / external / network if one is mounted
+    }
     let cores = std::thread::available_parallelism().map(|n| n.get() as i32).unwrap_or(4);
     ui.set_workers(cores);
     ui.set_r_workers(cores);
@@ -141,6 +145,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let (Some(ui), Some(code)) = (weak.upgrade(), codes.get(idx as usize)) {
                 *current.borrow_mut() = code.clone();
                 apply_language(&ui, &i18n, code, is_root);
+            }
+        });
+    }
+
+    // --- auto-detect sources (user/service/data dirs) ---
+    {
+        let weak = ui.as_weak();
+        ui.on_auto_sources(move || {
+            if let Some(ui) = weak.upgrade() {
+                let mut out = ui.get_sources().to_string();
+                let mut seen: std::collections::HashSet<String> =
+                    out.split(';').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+                for c in backuptool::discover::user_data_sources() {
+                    if matches!(c.kind.as_str(), "user" | "service" | "data") && seen.insert(c.path.clone()) {
+                        if !out.is_empty() {
+                            out.push(';');
+                        }
+                        out.push_str(&c.path);
+                    }
+                }
+                ui.set_sources(out.into());
             }
         });
     }

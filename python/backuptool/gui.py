@@ -25,7 +25,7 @@ try:
 except ImportError as e:  # handled by __main__ -> falls back to the CLI
     raise ImportError("PySide6 is not installed. Run:  pip install PySide6") from e
 
-from . import __version__, core
+from . import __version__, core, discover
 from .i18n import Translator, available
 
 
@@ -110,8 +110,9 @@ class MainWindow(QMainWindow):
         self.btn_add_dir = QPushButton(); self.btn_add_dir.clicked.connect(self._add_dir)
         self.btn_add_file = QPushButton(); self.btn_add_file.clicked.connect(self._add_file)
         self.btn_remove = QPushButton(); self.btn_remove.clicked.connect(self._rm_src)
+        self.btn_auto = QPushButton(); self.btn_auto.clicked.connect(self._auto_sources)
         row.addWidget(self.btn_add_dir); row.addWidget(self.btn_add_file)
-        row.addWidget(self.btn_remove); row.addStretch(1)
+        row.addWidget(self.btn_remove); row.addWidget(self.btn_auto); row.addStretch(1)
         gl.addLayout(row)
         lay.addWidget(self.gb_sources)
 
@@ -119,6 +120,9 @@ class MainWindow(QMainWindow):
         self.lbl_dest = QLabel()
         grid.addWidget(self.lbl_dest, 0, 0)
         self.dest = QLineEdit()
+        _auto_dest = discover.default_destination()
+        if _auto_dest:
+            self.dest.setText(_auto_dest)   # USB / external / network if found
         grid.addWidget(self.dest, 0, 1)
         self.btn_dest = QPushButton(); self.btn_dest.clicked.connect(lambda: self._pick_dir(self.dest))
         grid.addWidget(self.btn_dest, 0, 2)
@@ -168,6 +172,17 @@ class MainWindow(QMainWindow):
     def _rm_src(self):
         for it in self.sources.selectedItems():
             self.sources.takeItem(self.sources.row(it))
+
+    def _auto_sources(self):
+        """Add auto-detected user/service/data directories to the source list."""
+        existing = {self.sources.item(i).text() for i in range(self.sources.count())}
+        added = 0
+        for c in discover.user_data_sources():
+            if c["kind"] in ("user", "service", "data") and c["path"] not in existing:
+                self.sources.addItem(c["path"])
+                existing.add(c["path"])
+                added += 1
+        self.status.setText(f"+{added}")
 
     def _pick_dir(self, line: QLineEdit):
         d = QFileDialog.getExistingDirectory(self, self.tr_("choose"))
@@ -281,6 +296,7 @@ class MainWindow(QMainWindow):
         self.btn_add_dir.setText(t("add_folder"))
         self.btn_add_file.setText(t("add_file"))
         self.btn_remove.setText(t("remove"))
+        self.btn_auto.setText(t("auto_sources"))
         self.lbl_dest.setText(t("dest"))
         self.btn_dest.setText(t("choose"))
         self.lbl_set.setText(t("set_name"))

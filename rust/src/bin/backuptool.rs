@@ -70,6 +70,8 @@ enum Cmd {
         #[arg(short, long)]
         dest: String,
     },
+    /// List auto-detected sources and destinations
+    Discover,
 }
 
 fn default_workers() -> usize {
@@ -158,6 +160,23 @@ fn main() -> Result<()> {
             let stats = engine::restore(&opt, prog, log)?;
             bar.finish_and_clear();
             if stats.errors > 0 { std::process::exit(1); }
+        }
+        Cmd::Discover => {
+            use backuptool::discover;
+            println!("Sources (auto-detected):");
+            for c in discover::user_data_sources() {
+                println!("  {:8} {}", c.kind, c.path);
+            }
+            println!("Destinations (removable / network):");
+            let dests = discover::detect_destinations();
+            if dests.is_empty() {
+                println!("  (none mounted)");
+            }
+            for c in dests {
+                println!("  {:8} {}", c.kind, c.path);
+            }
+            println!("Suggested destination: {}",
+                discover::default_destination().unwrap_or_else(|| "(none)".into()));
         }
         Cmd::List { dest } => {
             let sets = engine::list_sets(&dest);

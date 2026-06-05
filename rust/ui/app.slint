@@ -37,6 +37,7 @@ export component MainWindow inherits Window {
     in property <string> t-tab-backup: "Backup";
     in property <string> t-sources: "Sources";
     in property <string> t-pick: "Choose";
+    in property <string> t-auto: "Auto";
     in property <string> t-dest: "Destination:";
     in property <string> t-set: "Backup set:";
     in property <string> t-workers: "Workers:";
@@ -70,6 +71,7 @@ export component MainWindow inherits Window {
 
     // --- callbacks ---
     callback pick-source();
+    callback auto-sources();
     callback pick-dest();
     callback start-backup();
     callback language-changed(int);
@@ -102,6 +104,7 @@ export component MainWindow inherits Window {
                         HorizontalBox {
                             LineEdit { text <=> root.sources; placeholder-text: "/path/a;/path/b"; }
                             Button { text: root.t-pick; clicked => { root.pick-source(); } }
+                            Button { text: root.t-auto; clicked => { root.auto-sources(); } }
                         }
                     }
                     HorizontalBox {

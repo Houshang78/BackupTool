@@ -4,6 +4,15 @@ All notable changes to this project. Versions follow [Semantic Versioning](https
 
 ## [Unreleased]
 ### Added
+- **Auto-discovery of sources and destinations** (both implementations). A new
+  `discover` module finds, per OS, the data worth backing up — real user homes,
+  service accounts with real data dirs (e.g. `postgres → /var/lib/postgresql`,
+  `www-data`), common data locations (`/srv`, `/var/www`, `/opt`) and system
+  config (`/etc`); on macOS/Windows the equivalent user/data dirs — and detects
+  mounted **USB / external / network** destinations. Exposed as a `backuptool
+  discover` CLI command and in both GUIs: the destination is pre-filled with a
+  detected USB/external/network mount, and an **"Auto"** button fills the source
+  list with the detected user/service/data directories.
 - **Run the GUI as administrator without breaking the file dialogs.** Launching
   the GUI plainly under `sudo` left the folder pickers dead (root cannot reach the
   user D-Bus/X session). New `backuptool-gui-admin` launcher elevates via `pkexec`
