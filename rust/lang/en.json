@@ -46,5 +46,9 @@
   "overlap_title": "Overlapping sources",
   "overlap_msg": "Some sources are already covered by another selected source:",
   "overlap_remove": "Remove redundant",
-  "overlap_keep": "Keep all"
+  "overlap_keep": "Keep all",
+  "uid_label": "UID(s)/users:",
+  "db_group": "Databases",
+  "db_dump": "Dump running databases",
+  "db_cmd_label": "Custom dump:"
 }

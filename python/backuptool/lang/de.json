@@ -46,5 +46,9 @@
   "overlap_title": "Überlappende Quellen",
   "overlap_msg": "Manche Quellen sind bereits durch eine andere Quelle abgedeckt:",
   "overlap_remove": "Redundante entfernen",
-  "overlap_keep": "Alle behalten"
+  "overlap_keep": "Alle behalten",
+  "uid_label": "UID(s)/Benutzer:",
+  "db_group": "Datenbanken",
+  "db_dump": "Laufende Datenbanken sichern",
+  "db_cmd_label": "Eigener Dump:"
 }

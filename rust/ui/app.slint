@@ -33,6 +33,13 @@ export component MainWindow inherits Window {
     in-out property <bool> system;
     in-out property <string> cipher: "none";
     in-out property <string> passphrase;
+    in-out property <string> uid;
+    in-out property <bool> db-dump;
+    in-out property <string> db-host;
+    in-out property <string> db-port;
+    in-out property <string> db-user;
+    in-out property <string> db-password;
+    in-out property <string> db-command;
 
     // --- backup tab: labels ---
     in property <string> t-tab-backup: "Backup";
@@ -40,6 +47,10 @@ export component MainWindow inherits Window {
     in property <string> t-pick: "Choose";
     in property <string> t-auto: "Auto";
     in property <string> t-extra: "Extra paths/files:";
+    in property <string> t-uid: "UID(s)/users:";
+    in property <string> t-db-group: "Databases";
+    in property <string> t-db-dump: "Dump running databases";
+    in property <string> t-db-cmd: "Custom dump:";
     in property <string> t-dest: "Destination:";
     in property <string> t-set: "Backup set:";
     in property <string> t-workers: "Workers:";
@@ -125,6 +136,10 @@ export component MainWindow inherits Window {
                         LineEdit { text <=> root.extra; placeholder-text: "/path/x;/path/y/file.db"; }
                     }
                     HorizontalBox {
+                        Text { vertical-alignment: center; text: root.t-uid; }
+                        LineEdit { text <=> root.uid; placeholder-text: "postgres;1001"; }
+                    }
+                    HorizontalBox {
                         CheckBox { text: root.t-checksum; checked <=> root.checksum; }
                         CheckBox { text: root.t-delete; checked <=> root.delete-missing; }
                         CheckBox { text: root.t-system; checked <=> root.system; }
@@ -137,6 +152,22 @@ export component MainWindow inherits Window {
                             text <=> root.passphrase;
                             input-type: password;
                             enabled: root.cipher != "none";
+                        }
+                    }
+                    GroupBox {
+                        title: root.t-db-group;
+                        VerticalBox {
+                            CheckBox { text: root.t-db-dump; checked <=> root.db-dump; }
+                            HorizontalBox {
+                                LineEdit { placeholder-text: "Host"; text <=> root.db-host; }
+                                LineEdit { placeholder-text: "Port"; text <=> root.db-port; }
+                                LineEdit { placeholder-text: "User"; text <=> root.db-user; }
+                                LineEdit { placeholder-text: "Pass"; text <=> root.db-password; input-type: password; }
+                            }
+                            HorizontalBox {
+                                Text { vertical-alignment: center; text: root.t-db-cmd; }
+                                LineEdit { placeholder-text: "oracle=expdp ..."; text <=> root.db-command; }
+                            }
                         }
                     }
                     Button {

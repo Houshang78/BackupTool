@@ -15,6 +15,7 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
+#[allow(clippy::large_enum_variant)] // clap subcommands naturally vary in size
 enum Cmd {
     /// Back up
     Backup {
@@ -57,6 +58,16 @@ enum Cmd {
         /// generic DB dump (e.g. Oracle): NAME=command, runs with $BACKUPTOOL_DB_OUT
         #[arg(long = "db-command")]
         db_command: Vec<String>,
+        #[arg(long = "db-host")]
+        db_host: Option<String>,
+        #[arg(long = "db-port")]
+        db_port: Option<String>,
+        #[arg(long = "db-user")]
+        db_user: Option<String>,
+        #[arg(long = "db-password")]
+        db_password: Option<String>,
+        #[arg(long = "db-socket")]
+        db_socket: Option<String>,
     },
     /// Restore
     Restore {
@@ -130,7 +141,8 @@ fn make_bar() -> ProgressBar {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
-        Cmd::Backup { sources, dest, set, workers, checksum, exclude, delete, system, no_system, dry_run, cipher, uid, db, db_command } => {
+        Cmd::Backup { sources, dest, set, workers, checksum, exclude, delete, system, no_system, dry_run, cipher, uid, db, db_command,
+                      db_host, db_port, db_user, db_password, db_socket } => {
             if sources.is_empty() {
                 return Err(anyhow!("Provide at least one source."));
             }
@@ -162,11 +174,15 @@ fn main() -> Result<()> {
 
             if !dry_run && (!db.is_empty() || !db_command.is_empty()) {
                 use backuptool::dbdump;
+                let conn = dbdump::DbConn {
+                    host: db_host, port: db_port, user: db_user,
+                    password: db_password, socket: db_socket,
+                };
                 let mut specs: Vec<dbdump::DbSpec> = Vec::new();
                 if !db.is_empty() {
                     let detected = dbdump::detect_databases();
                     if db.iter().any(|d| d == "all") {
-                        specs.extend(detected);
+                        specs.extend(detected.into_iter().filter(|d| d.running));  // running only
                     } else {
                         for want in &db {
                             specs.extend(detected.iter().filter(|d| &d.name == want || &d.kind == want).cloned());
@@ -175,13 +191,13 @@ fn main() -> Result<()> {
                 }
                 for item in &db_command {
                     if let Some((n, c)) = item.split_once('=') {
-                        specs.push(dbdump::DbSpec { name: n.into(), kind: "generic".into(), shell: Some(c.into()) });
+                        specs.push(dbdump::DbSpec { name: n.into(), kind: "generic".into(), shell: Some(c.into()), running: true });
                     }
                 }
                 if !specs.is_empty() {
                     let out_dir = std::path::Path::new(&dest_for_db).join(&set_for_db).join(dbdump::DB_DIR);
                     println!("Dumping {} database(s) -> {}", specs.len(), out_dir.display());
-                    dbdump::dump_all(&specs, &out_dir, &|m: &str| println!("{m}"));
+                    dbdump::dump_all(&specs, &out_dir, &conn, &|m: &str| println!("{m}"));
                 }
             }
             if stats.errors > 0 { std::process::exit(1); }
@@ -231,9 +247,9 @@ fn main() -> Result<()> {
             } else {
                 println!("Detected databases:");
                 for d in dbs {
-                    println!("  {:12} ({})", d.kind, d.name);
+                    println!("  {:12} ({})  {}", d.kind, d.name, if d.running { "running" } else { "stopped" });
                 }
-                println!("Dump with:       backuptool backup ... --db all");
+                println!("Dump with:       backuptool backup ... --db all   (running ones)");
                 println!("Generic/Oracle:  backuptool backup ... --db-command 'oracle=expdp ...'");
             }
         }

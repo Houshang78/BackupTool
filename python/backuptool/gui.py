@@ -10,6 +10,7 @@ Requires:  pip install PySide6
 """
 from __future__ import annotations
 
+import functools
 import os
 import socket
 import sys
@@ -25,7 +26,7 @@ try:
 except ImportError as e:  # handled by __main__ -> falls back to the CLI
     raise ImportError("PySide6 is not installed. Run:  pip install PySide6") from e
 
-from . import __version__, core, discover
+from . import __version__, core, discover, dbdump
 from .i18n import Translator, available
 
 
@@ -150,6 +151,12 @@ class MainWindow(QMainWindow):
         self.extra = QLineEdit()
         self.extra.setPlaceholderText("/path/x, /path/y/file.db")
         grid.addWidget(self.extra, 4, 1, 1, 2)
+
+        self.lbl_uid = QLabel()
+        grid.addWidget(self.lbl_uid, 5, 0)
+        self.uidf = QLineEdit()
+        self.uidf.setPlaceholderText("postgres, 1001")
+        grid.addWidget(self.uidf, 5, 1, 1, 2)
         lay.addLayout(grid)
 
         self.cb_checksum = QCheckBox()
@@ -158,6 +165,26 @@ class MainWindow(QMainWindow):
         self.cb_dry = QCheckBox()
         lay.addWidget(self.cb_checksum); lay.addWidget(self.cb_delete)
         lay.addWidget(self.cb_system); lay.addWidget(self.cb_dry)
+
+        # Databases: dump running DBs (+ optional connection) and a generic command.
+        self.gb_db = QGroupBox()
+        dbg = QGridLayout(self.gb_db)
+        self.cb_databases = QCheckBox()
+        dbg.addWidget(self.cb_databases, 0, 0, 1, 4)
+        dbg.addWidget(QLabel("Host"), 1, 0)
+        self.db_host = QLineEdit(); dbg.addWidget(self.db_host, 1, 1)
+        dbg.addWidget(QLabel("Port"), 1, 2)
+        self.db_port = QLineEdit(); dbg.addWidget(self.db_port, 1, 3)
+        dbg.addWidget(QLabel("User"), 2, 0)
+        self.db_user = QLineEdit(); dbg.addWidget(self.db_user, 2, 1)
+        dbg.addWidget(QLabel("Pass"), 2, 2)
+        self.db_pass = QLineEdit(); self.db_pass.setEchoMode(QLineEdit.Password)
+        dbg.addWidget(self.db_pass, 2, 3)
+        self.lbl_db_cmd = QLabel()
+        dbg.addWidget(self.lbl_db_cmd, 3, 0)
+        self.db_cmd = QLineEdit(); self.db_cmd.setPlaceholderText("oracle=expdp ...")
+        dbg.addWidget(self.db_cmd, 3, 1, 1, 3)
+        lay.addWidget(self.gb_db)
 
         self.btn_start_backup = QPushButton()
         self.btn_start_backup.clicked.connect(self._start_backup)
@@ -223,11 +250,24 @@ class MainWindow(QMainWindow):
             return [s for s in sources if s not in redundant]
         return sources  # keep all
 
+    def _backup_then_db(self, log, progress, core_kwargs, specs, conn, out_dir):
+        """Run the file backup, then dump the requested databases."""
+        res = core.backup(log=log, progress=progress, **core_kwargs)
+        if specs and not core_kwargs.get("dry_run"):
+            log(f"Dumping {len(specs)} database(s) -> {out_dir}")
+            dbdump.dump_all(specs, out_dir, log=log, conn=conn)
+        return res
+
     def _start_backup(self):
         sources = [self.sources.item(i).text() for i in range(self.sources.count())]
         for p in (x.strip() for x in self.extra.text().replace(";", ",").split(",")):
             if p and p not in sources:
                 sources.append(p)
+        for u in (x.strip() for x in self.uidf.text().replace(";", ",").split(",")):
+            if u:
+                d = discover.resolve_uid(u)
+                if d and d not in sources:
+                    sources.append(d)
         if not sources:
             QMessageBox.warning(self, self.tr_("missing"), self.tr_("need_source"))
             return
@@ -245,7 +285,19 @@ class MainWindow(QMainWindow):
             prune=self.cb_delete.isChecked(), dry_run=self.cb_dry.isChecked(),
             include_system=self.cb_system.isChecked(),
         )
-        self._run(core.backup, kwargs, self.tr_("tab_backup"))
+        conn = {k: v for k, v in (("host", self.db_host.text().strip()),
+                ("port", self.db_port.text().strip()), ("user", self.db_user.text().strip()),
+                ("password", self.db_pass.text())) if v}
+        specs = [d for d in dbdump.detect_databases() if d["running"]] if self.cb_databases.isChecked() else []
+        cmd = self.db_cmd.text().strip()
+        if "=" in cmd:
+            n, c = cmd.split("=", 1)
+            specs.append({"name": n, "shell": c})
+        out_dir = os.path.join(os.path.abspath(self.dest.text()),
+                               self.setname.text() or socket.gethostname(), dbdump.DB_DIR)
+        func = functools.partial(self._backup_then_db, core_kwargs=kwargs,
+                                 specs=specs, conn=conn or None, out_dir=out_dir)
+        self._run(func, {}, self.tr_("tab_backup"))
 
     # ---------------------------------------------------------- Restore tab
     def _build_restore_tab(self) -> QWidget:
@@ -344,6 +396,10 @@ class MainWindow(QMainWindow):
         self.lbl_workers.setText(t("workers"))
         self.lbl_excl.setText(t("excludes"))
         self.lbl_extra.setText(t("extra_paths"))
+        self.lbl_uid.setText(t("uid_label"))
+        self.gb_db.setTitle(t("db_group"))
+        self.cb_databases.setText(t("db_dump"))
+        self.lbl_db_cmd.setText(t("db_cmd_label"))
         self.cb_checksum.setText(t("opt_checksum"))
         self.cb_delete.setText(t("opt_delete"))
         self.cb_system.setText(t("opt_system"))

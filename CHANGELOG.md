@@ -4,16 +4,18 @@ All notable changes to this project. Versions follow [Semantic Versioning](https
 
 ## [Unreleased]
 ### Added
-- **UID inclusion + database dumps** (engine + CLI, both implementations). A UID
-  or username resolves to its home/data dir and is added as a source
-  (`backuptool backup --uid postgres --uid 1001 ...`). A new `dbdump` module
-  detects locally installed databases (`backuptool databases`) and dumps them
-  into the set's `.backuptool-db/` folder during a backup (`--db all` or
-  `--db postgresql`): **PostgreSQL** (`pg_dumpall`), **MySQL/MariaDB**
-  (`mysqldump`), **Redis** (`redis-cli --rdb`), **MongoDB** (`mongodump`). Any
-  other engine — **Oracle**, MS SQL, … — is covered by a generic adapter:
-  `--db-command 'oracle=expdp ...'` runs with `$BACKUPTOOL_DB_OUT` set. (GUI
-  wiring follows.)
+- **UID inclusion + database dumps** (both implementations, CLI **and GUI**). A
+  UID or username resolves to its home/data dir and is added as a source. A new
+  `dbdump` module detects locally installed databases, reports whether each is
+  **actually running** (`backuptool databases`), and dumps the running ones into
+  the set's `.backuptool-db/` folder during a backup: **PostgreSQL**, **MySQL/
+  MariaDB**, **Redis**, **MongoDB**. Optional **connection settings**
+  (host/port/socket/user/password) are folded into the dump command; passwords
+  for PostgreSQL/MySQL go via the environment. Any other engine — **Oracle**,
+  MS SQL, … — uses a generic adapter (`--db-command 'oracle=expdp ...'`, runs
+  with `$BACKUPTOOL_DB_OUT` set). The GUIs gain a UID field and a Databases
+  section (dump toggle, connection fields, custom-command field). Dumps connect
+  to the running service, so a relocated data directory does not affect them.
 - **Overlap-aware sources + extra-paths field** (both implementations). A new
   `analyze_overlaps()` flags sources already covered by another selected source
   (a sub-path or a duplicate). Before a backup the GUI lists the redundant paths

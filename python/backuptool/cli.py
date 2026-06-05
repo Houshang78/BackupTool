@@ -39,13 +39,15 @@ def cmd_backup(a):
         progress=_progress if a.progress else None,
     )
 
+    conn = {k: v for k, v in (("host", a.db_host), ("port", a.db_port),
+            ("user", a.db_user), ("password", a.db_password), ("socket", a.db_socket)) if v}
     specs = []                              # database dumps
     if a.db:
         detected = dbdump.detect_databases()
         if "all" in a.db:
-            specs.extend(detected)
+            specs.extend(d for d in detected if d["running"])  # only running ones
         else:
-            for want in a.db:
+            for want in a.db:               # explicit name forces a dump attempt
                 specs.extend(d for d in detected if want in (d["name"], d["kind"]))
     for item in a.db_command:               # generic / Oracle: NAME=command
         if "=" in item:
@@ -55,7 +57,7 @@ def cmd_backup(a):
         setname = a.set or socket.gethostname()
         out_dir = os.path.join(os.path.abspath(a.dest), setname, dbdump.DB_DIR)
         print(f"Dumping {len(specs)} database(s) -> {out_dir}")
-        dbdump.dump_all(specs, out_dir, log=print)
+        dbdump.dump_all(specs, out_dir, log=print, conn=conn or None)
     return res
 
 
@@ -85,8 +87,8 @@ def cmd_databases(a):
         return
     print("Detected databases:")
     for d in dbs:
-        print(f"  {d['kind']:12} ({d['name']})")
-    print("Dump into a backup with:  backuptool backup ... --db all")
+        print(f"  {d['kind']:12} ({d['name']})  {'running' if d['running'] else 'stopped'}")
+    print("Dump into a backup with:  backuptool backup ... --db all  (running ones)")
     print("Generic/Oracle:           backuptool backup ... "
           "--db-command 'oracle=expdp ...'")
 
@@ -142,6 +144,11 @@ def build_parser():
                    help="dump a database into the set: postgresql|mysql|redis|mongodb|all")
     b.add_argument("--db-command", action="append", default=[], metavar="NAME=CMD",
                    help="generic DB dump (e.g. Oracle); CMD runs with $BACKUPTOOL_DB_OUT set")
+    b.add_argument("--db-host", help="database host (default: local socket)")
+    b.add_argument("--db-port", help="database port")
+    b.add_argument("--db-user", help="database user")
+    b.add_argument("--db-password", help="database password")
+    b.add_argument("--db-socket", help="database unix socket path")
     _add_common(b)
     b.set_defaults(func=cmd_backup)
 

@@ -69,6 +69,11 @@ where
     });
 }
 
+fn nonempty(s: SharedString) -> Option<String> {
+    let t = s.trim();
+    if t.is_empty() { None } else { Some(t.to_string()) }
+}
+
 #[cfg(unix)]
 fn is_root_user() -> bool {
     unsafe { libc::geteuid() == 0 }
@@ -90,6 +95,10 @@ fn apply_language(ui: &MainWindow, i18n: &I18n, code: &str, is_root: bool) {
     ui.set_t_pick(t("choose").into());
     ui.set_t_auto(t("auto_sources").into());
     ui.set_t_extra(t("extra_paths").into());
+    ui.set_t_uid(t("uid_label").into());
+    ui.set_t_db_group(t("db_group").into());
+    ui.set_t_db_dump(t("db_dump").into());
+    ui.set_t_db_cmd(t("db_cmd_label").into());
     ui.set_t_dest(t("dest").into());
     ui.set_t_set(t("set_name").into());
     ui.set_t_workers(t("workers").into());
@@ -225,6 +234,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     sources.push(p.to_string());
                 }
             }
+            // Resolve UID(s)/usernames to their home/data dirs.
+            for u in ui.get_uid().split([';', ',']).map(|s| s.trim()).filter(|s| !s.is_empty()) {
+                if let Some(d) = backuptool::discover::resolve_uid(u) {
+                    if !sources.iter().any(|s| s == &d) {
+                        sources.push(d);
+                    }
+                }
+            }
             if sources.is_empty() { ui.set_status(tr("need_source").into()); return; }
             let dest = ui.get_dest().to_string();
             if dest.is_empty() { ui.set_status(tr("need_dest").into()); return; }
@@ -254,10 +271,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
+            // Database dump options (read on the UI thread).
+            let set_name = ui.get_setname().to_string();
+            let db_out = std::path::Path::new(&dest).join(&set_name).join(backuptool::dbdump::DB_DIR);
+            let db_conn = backuptool::dbdump::DbConn {
+                host: nonempty(ui.get_db_host()), port: nonempty(ui.get_db_port()),
+                user: nonempty(ui.get_db_user()), password: nonempty(ui.get_db_password()), socket: None,
+            };
+            let mut db_specs: Vec<backuptool::dbdump::DbSpec> = Vec::new();
+            if ui.get_db_dump() {
+                db_specs.extend(backuptool::dbdump::detect_databases().into_iter().filter(|d| d.running));
+            }
+            if let Some((n, c)) = ui.get_db_command().to_string().split_once('=') {
+                db_specs.push(backuptool::dbdump::DbSpec {
+                    name: n.into(), kind: "generic".into(), shell: Some(c.into()), running: true,
+                });
+            }
+
             let opt = BackupOptions {
                 sources,
                 dest,
-                set: ui.get_setname().to_string(),
+                set: set_name,
                 workers: ui.get_workers().max(1) as usize,
                 use_checksum: ui.get_checksum(),
                 excludes: vec![],
@@ -268,9 +302,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 passphrase: if cipher != Cipher::None { Some(pass) } else { None },
             };
             ui.set_status(tr("running").into());
-            spawn_job(&ui, move |progress, log| match engine::backup(&opt, progress, log) {
-                Ok(s) => format!("{} copied, {} skipped, {} errors.", s.copied, s.skipped, s.errors),
-                Err(e) => format!("{e}"),
+            spawn_job(&ui, move |progress, log| {
+                let result = engine::backup(&opt, &progress, &log);
+                if !db_specs.is_empty() {
+                    log(&format!("Dumping {} database(s) -> {}", db_specs.len(), db_out.display()));
+                    backuptool::dbdump::dump_all(&db_specs, &db_out, &db_conn, &log);
+                }
+                match result {
+                    Ok(s) => format!("{} copied, {} skipped, {} errors.", s.copied, s.skipped, s.errors),
+                    Err(e) => format!("{e}"),
+                }
             });
         });
     }

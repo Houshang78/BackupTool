@@ -15,8 +15,13 @@ def _silent(*_a, **_k):
 class TestDbDump(unittest.TestCase):
     def test_detect_shape(self):
         for d in dbdump.detect_databases():
-            self.assertEqual(set(d), {"name", "kind"})
+            self.assertEqual(set(d), {"name", "kind", "running"})
             self.assertIn(d["kind"], ("postgresql", "mysql", "redis", "mongodb"))
+            self.assertIsInstance(d["running"], bool)
+
+    def test_is_running_no_crash(self):
+        # An unknown engine (no default port/socket) must return False, not raise.
+        self.assertFalse(dbdump.is_running("nope_db", {"port": 1}))
 
     def test_generic_dump_runs(self):
         tmp = tempfile.mkdtemp()
