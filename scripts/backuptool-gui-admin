@@ -15,9 +15,19 @@
 #   user and type the paths into the fields.
 set -u
 
-# Resolve the GUI command: prefer the Rust single binary, else the Python GUI.
+# Resolve the GUI command to an ABSOLUTE path: pkexec changes the working
+# directory, so a relative ./backuptool-gui would not be found by the elevated
+# process.
+abspath() {
+  case "$1" in
+    /*) printf '%s' "$1" ;;
+    *)  printf '%s/%s' "$(pwd)" "$1" ;;
+  esac
+}
 if [ -n "${BACKUPTOOL_GUI:-}" ]; then
-  GUI_CMD="$BACKUPTOOL_GUI"
+  GUI_BIN="$(abspath "$BACKUPTOOL_GUI")"
+  [ -x "$GUI_BIN" ] || { echo "Not found or not executable: $GUI_BIN  (chmod +x it?)" >&2; exit 1; }
+  GUI_CMD="$GUI_BIN"
 elif command -v backuptool-gui >/dev/null 2>&1; then
   GUI_CMD="$(command -v backuptool-gui)"
 elif command -v backuptool >/dev/null 2>&1; then
@@ -25,6 +35,13 @@ elif command -v backuptool >/dev/null 2>&1; then
 else
   echo "No backuptool GUI found. Set BACKUPTOOL_GUI=/path/to/backuptool-gui." >&2
   exit 1
+fi
+
+# pkexec needs a local login session; over SSH it fails with "No session for
+# cookie". Tell the user instead of failing cryptically.
+if [ -n "${SSH_CONNECTION:-}" ] && command -v pkexec >/dev/null 2>&1; then
+  echo "Note: pkexec needs a local desktop session and usually fails over SSH." >&2
+  echo "      Run this on the machine's own screen, not through SSH." >&2
 fi
 
 # Desktop session passed through to root so dialogs can render.
