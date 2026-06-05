@@ -41,5 +41,10 @@
   "no_sets": "Keine Backup-Sets gefunden.",
   "busy": "Es läuft bereits eine Aufgabe.",
   "done_suffix": "fertig.",
-  "error": "Fehler"
+  "error": "Fehler",
+  "extra_paths": "Zusätzliche Pfade/Dateien:",
+  "overlap_title": "Überlappende Quellen",
+  "overlap_msg": "Manche Quellen sind bereits durch eine andere Quelle abgedeckt:",
+  "overlap_remove": "Redundante entfernen",
+  "overlap_keep": "Alle behalten"
 }

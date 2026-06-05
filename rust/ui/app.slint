@@ -24,6 +24,7 @@ export component MainWindow inherits Window {
 
     // --- backup tab: data ---
     in-out property <string> sources;
+    in-out property <string> extra;
     in-out property <string> dest;
     in-out property <string> setname;
     in-out property <int> workers: 4;
@@ -38,6 +39,7 @@ export component MainWindow inherits Window {
     in property <string> t-sources: "Sources";
     in property <string> t-pick: "Choose";
     in property <string> t-auto: "Auto";
+    in property <string> t-extra: "Extra paths/files:";
     in property <string> t-dest: "Destination:";
     in property <string> t-set: "Backup set:";
     in property <string> t-workers: "Workers:";
@@ -117,6 +119,10 @@ export component MainWindow inherits Window {
                         LineEdit { text <=> root.setname; }
                         Text { vertical-alignment: center; text: root.t-workers; }
                         SpinBox { value <=> root.workers; minimum: 1; maximum: 64; }
+                    }
+                    HorizontalBox {
+                        Text { vertical-alignment: center; text: root.t-extra; }
+                        LineEdit { text <=> root.extra; placeholder-text: "/path/x;/path/y/file.db"; }
                     }
                     HorizontalBox {
                         CheckBox { text: root.t-checksum; checked <=> root.checksum; }

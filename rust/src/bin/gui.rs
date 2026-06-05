@@ -89,6 +89,7 @@ fn apply_language(ui: &MainWindow, i18n: &I18n, code: &str, is_root: bool) {
     ui.set_t_sources(t("sources").into());
     ui.set_t_pick(t("choose").into());
     ui.set_t_auto(t("auto_sources").into());
+    ui.set_t_extra(t("extra_paths").into());
     ui.set_t_dest(t("dest").into());
     ui.set_t_set(t("set_name").into());
     ui.set_t_workers(t("workers").into());
@@ -216,11 +217,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ui.set_status(tr("need_password").into());
                 return;
             }
-            let sources: Vec<String> = ui.get_sources().split(';')
+            let mut sources: Vec<String> = ui.get_sources().split(';')
                 .map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+            // Merge the "extra paths/files" field (comma or semicolon separated).
+            for p in ui.get_extra().split([';', ',']).map(|s| s.trim()).filter(|s| !s.is_empty()) {
+                if !sources.iter().any(|s| s == p) {
+                    sources.push(p.to_string());
+                }
+            }
             if sources.is_empty() { ui.set_status(tr("need_source").into()); return; }
             let dest = ui.get_dest().to_string();
             if dest.is_empty() { ui.set_status(tr("need_dest").into()); return; }
+
+            // Overlap check: warn about sources already covered by another.
+            let overlaps = backuptool::discover::analyze_overlaps(&sources);
+            if !overlaps.is_empty() {
+                let mut desc = String::new();
+                for o in overlaps.iter().take(20) {
+                    desc.push_str(&format!("• {}  ⊂  {}\n", o.path, o.covered_by));
+                }
+                let answer = rfd::MessageDialog::new()
+                    .set_level(rfd::MessageLevel::Warning)
+                    .set_title(tr("overlap_title"))
+                    .set_description(format!("{}\n\n{}\n[{} = Yes, {} = No]",
+                        tr("overlap_msg"), desc, tr("overlap_remove"), tr("overlap_keep")))
+                    .set_buttons(rfd::MessageButtons::YesNoCancel)
+                    .show();
+                match answer {
+                    rfd::MessageDialogResult::Yes => {
+                        let redundant: std::collections::HashSet<&str> =
+                            overlaps.iter().map(|o| o.path.as_str()).collect();
+                        sources.retain(|s| !redundant.contains(s.as_str()));
+                    }
+                    rfd::MessageDialogResult::No => {}            // keep all
+                    _ => { ui.set_status(tr("ready").into()); return; }   // cancel
+                }
+            }
 
             let opt = BackupOptions {
                 sources,

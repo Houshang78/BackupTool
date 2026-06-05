@@ -84,6 +84,38 @@ def is_excluded(path: str, patterns) -> bool:
     return any(fnmatch.fnmatch(path, p) for p in patterns)
 
 
+def _is_subpath(child: str, parent: str) -> bool:
+    parent = parent.rstrip("/") or "/"
+    return child == parent or child.startswith(parent + "/")
+
+
+def analyze_overlaps(paths) -> list:
+    """Find sources already covered by another selected source.
+
+    Returns a list of {"path": original, "covered_by": original} for every entry
+    that is a sub-path of (or a duplicate of an earlier) entry. The copy step
+    de-duplicates anyway; this lets the UI warn before doing redundant work."""
+    norm = [os.path.realpath(os.path.abspath(p)) for p in paths]
+    out = []
+    for i, p in enumerate(norm):
+        for j, q in enumerate(norm):
+            if i == j:
+                continue
+            if (p == q and j < i) or (p != q and _is_subpath(p, q)):
+                out.append({"path": paths[i], "covered_by": paths[j]})
+                break
+    return out
+
+
+def brief_listing(path: str, limit: int = 40) -> list:
+    """A short, sorted sample of a directory's entries (for the overlap prompt)."""
+    try:
+        names = sorted(os.listdir(path))
+    except OSError:
+        return []
+    return names[:limit]
+
+
 # ----------------------------------------------------------------------------
 # Scan
 # ----------------------------------------------------------------------------

@@ -4,6 +4,13 @@ All notable changes to this project. Versions follow [Semantic Versioning](https
 
 ## [Unreleased]
 ### Added
+- **Overlap-aware sources + extra-paths field** (both implementations). A new
+  `analyze_overlaps()` flags sources already covered by another selected source
+  (a sub-path or a duplicate). Before a backup the GUI lists the redundant paths
+  (with a sample of their contents) and lets you **remove the redundant ones,
+  keep all, or cancel** — the copy step de-duplicates regardless, so no file is
+  ever backed up twice. A new **"Extra paths/files"** field lets you add specific
+  paths/files; they are merged into the sources (overlap-checked).
 - **Auto-discovery of sources and destinations** (both implementations). A new
   `discover` module finds, per OS, the data worth backing up — real user homes,
   service accounts with real data dirs (e.g. `postgres → /var/lib/postgresql`,

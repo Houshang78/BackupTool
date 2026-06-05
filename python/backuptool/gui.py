@@ -144,6 +144,12 @@ class MainWindow(QMainWindow):
         grid.addWidget(self.lbl_excl, 3, 0)
         self.excl = QLineEdit()
         grid.addWidget(self.excl, 3, 1, 1, 2)
+
+        self.lbl_extra = QLabel()
+        grid.addWidget(self.lbl_extra, 4, 0)
+        self.extra = QLineEdit()
+        self.extra.setPlaceholderText("/path/x, /path/y/file.db")
+        grid.addWidget(self.extra, 4, 1, 1, 2)
         lay.addLayout(grid)
 
         self.cb_checksum = QCheckBox()
@@ -189,13 +195,47 @@ class MainWindow(QMainWindow):
         if d:
             line.setText(d)
 
+    def _resolve_overlaps(self, sources):
+        """Warn about sources already covered by another; return the kept list
+        (or None if the user cancelled)."""
+        overlaps = core.analyze_overlaps(sources)
+        if not overlaps:
+            return sources
+        lines = []
+        for o in overlaps[:20]:
+            sample = ", ".join(core.brief_listing(o["path"], 8))
+            lines.append(f"• {o['path']}  ⊂  {o['covered_by']}"
+                         + (f"\n    [{sample}]" if sample else ""))
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Question)
+        box.setWindowTitle(self.tr_("overlap_title"))
+        box.setText(self.tr_("overlap_msg"))
+        box.setInformativeText("\n".join(lines))
+        remove_btn = box.addButton(self.tr_("overlap_remove"), QMessageBox.AcceptRole)
+        box.addButton(self.tr_("overlap_keep"), QMessageBox.RejectRole)
+        box.addButton(QMessageBox.Cancel)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is None or box.standardButton(clicked) == QMessageBox.Cancel:
+            return None
+        if clicked is remove_btn:
+            redundant = {o["path"] for o in overlaps}
+            return [s for s in sources if s not in redundant]
+        return sources  # keep all
+
     def _start_backup(self):
         sources = [self.sources.item(i).text() for i in range(self.sources.count())]
+        for p in (x.strip() for x in self.extra.text().replace(";", ",").split(",")):
+            if p and p not in sources:
+                sources.append(p)
         if not sources:
             QMessageBox.warning(self, self.tr_("missing"), self.tr_("need_source"))
             return
         if not self.dest.text():
             QMessageBox.warning(self, self.tr_("missing"), self.tr_("need_dest"))
+            return
+        sources = self._resolve_overlaps(sources)
+        if sources is None:
             return
         excludes = [x.strip() for x in self.excl.text().split(",") if x.strip()]
         kwargs = dict(
@@ -303,6 +343,7 @@ class MainWindow(QMainWindow):
         self.lbl_set_hint.setText(t("per_system_hint"))
         self.lbl_workers.setText(t("workers"))
         self.lbl_excl.setText(t("excludes"))
+        self.lbl_extra.setText(t("extra_paths"))
         self.cb_checksum.setText(t("opt_checksum"))
         self.cb_delete.setText(t("opt_delete"))
         self.cb_system.setText(t("opt_system"))

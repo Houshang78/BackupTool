@@ -188,9 +188,74 @@ pub fn default_destination() -> Option<String> {
     None
 }
 
+#[derive(Clone, Debug)]
+pub struct Overlap {
+    pub path: String,
+    pub covered_by: String,
+}
+
+fn is_subpath(child: &str, parent: &str) -> bool {
+    let parent = parent.trim_end_matches('/');
+    let parent = if parent.is_empty() { "/" } else { parent };
+    child == parent || child.starts_with(&format!("{parent}/"))
+}
+
+/// Sources already covered by another selected source (sub-path or earlier
+/// duplicate). The copy step de-duplicates anyway; this lets the UI warn first.
+pub fn analyze_overlaps(paths: &[String]) -> Vec<Overlap> {
+    let norm: Vec<String> = paths
+        .iter()
+        .map(|p| {
+            std::fs::canonicalize(p)
+                .map(|x| x.to_string_lossy().into_owned())
+                .unwrap_or_else(|_| p.clone())
+        })
+        .collect();
+    let mut out = Vec::new();
+    for i in 0..norm.len() {
+        for j in 0..norm.len() {
+            if i == j {
+                continue;
+            }
+            let dup_earlier = norm[i] == norm[j] && j < i;
+            let under = norm[i] != norm[j] && is_subpath(&norm[i], &norm[j]);
+            if dup_earlier || under {
+                out.push(Overlap { path: paths[i].clone(), covered_by: paths[j].clone() });
+                break;
+            }
+        }
+    }
+    out
+}
+
+/// A short, sorted sample of a directory's entries (for the overlap prompt).
+pub fn brief_listing(path: &str, limit: usize) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(path)
+        .map(|rd| rd.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect())
+        .unwrap_or_default();
+    names.sort();
+    names.truncate(limit);
+    names
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn overlap_detects_subpath_and_dup() {
+        let v = vec!["/usr".to_string(), "/usr/bin".to_string(), "/usr".to_string()];
+        let o = analyze_overlaps(&v);
+        // "/usr/bin" covered by "/usr", and the 2nd "/usr" is a duplicate.
+        assert!(o.iter().any(|x| x.path == "/usr/bin" && x.covered_by == "/usr"));
+        assert!(o.iter().any(|x| x.path == "/usr" && x.covered_by == "/usr"));
+    }
+
+    #[test]
+    fn overlap_independent_paths_none() {
+        let v = vec!["/usr".to_string(), "/etc".to_string()];
+        assert!(analyze_overlaps(&v).is_empty());
+    }
 
     #[test]
     fn sources_are_real_dirs() {

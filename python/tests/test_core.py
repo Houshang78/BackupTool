@@ -51,6 +51,14 @@ class TestCore(unittest.TestCase):
         res = core.backup([self.src], self.dst, setname="t", log=_silent)
         self.assertEqual(res["copied"], 2)  # a.txt + sub/b.txt only, no dirs
 
+    def test_overlap_detection(self):
+        ov = core.analyze_overlaps([self.src, os.path.join(self.src, "sub")])
+        covered = {o["path"] for o in ov}
+        self.assertIn(os.path.join(self.src, "sub"), covered)
+
+    def test_overlap_none_for_independent(self):
+        self.assertEqual(core.analyze_overlaps([self.src, self.dst]), [])
+
     def test_incremental_skips_unchanged(self):
         core.backup([self.src], self.dst, setname="t", log=_silent)
         res = core.backup([self.src], self.dst, setname="t", log=_silent)

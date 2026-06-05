@@ -41,5 +41,10 @@
   "no_sets": "No backup sets found.",
   "busy": "A task is already running.",
   "done_suffix": "done.",
-  "error": "Error"
+  "error": "Error",
+  "extra_paths": "Extra paths/files:",
+  "overlap_title": "Overlapping sources",
+  "overlap_msg": "Some sources are already covered by another selected source:",
+  "overlap_remove": "Remove redundant",
+  "overlap_keep": "Keep all"
 }
