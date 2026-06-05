@@ -4,7 +4,7 @@
 # Result:  dist/backuptool_<version>_all.deb
 set -euo pipefail
 
-VERSION="1.2.3"
+VERSION="1.2.4"
 PKG="backuptool"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD="$ROOT/dist/deb"

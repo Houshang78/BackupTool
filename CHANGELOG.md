@@ -2,7 +2,7 @@
 
 All notable changes to this project. Versions follow [Semantic Versioning](https://semver.org).
 
-## [Unreleased]
+## [1.2.4]
 ### Added
 - **UID inclusion + database dumps** (both implementations, CLI **and GUI**). A
   UID or username resolves to its home/data dir and is added as a source. A new
