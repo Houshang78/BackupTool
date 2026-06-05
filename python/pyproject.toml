@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "backuptool"
-version = "1.2.2"
+version = "1.2.3"
 description = "Cross-platform, parallel, incremental backup tool (Linux/macOS/Windows) with a Qt6 GUI"
 readme = "README.md"
 requires-python = ">=3.8"

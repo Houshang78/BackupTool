@@ -66,7 +66,7 @@ pip install .                                   # Dev-Install: backuptool, backu
 ### Native Pakete
 ```bash
 cd python
-bash packaging/build-deb.sh                     # Linux  -> dist/backuptool_1.2.2_all.deb
+bash packaging/build-deb.sh                     # Linux  -> dist/backuptool_1.2.3_all.deb
 bash packaging/build-macos.sh                   # macOS  -> dist/backuptool.app + .pkg
 powershell -File packaging\build-windows.ps1    # Windows -> dist\backuptool.exe (PyInstaller)
 ```
@@ -80,8 +80,8 @@ powershell -File packaging\build-windows.ps1    # Windows -> dist\backuptool.exe
 Ein Tag-Push startet `.github/workflows/release.yml`, baut dieselben Artefakte auf
 GitHubs Linux/macOS/Windows-Runnern und hängt sie ans GitHub-Release:
 ```bash
-git tag v1.2.2
-git push origin v1.2.2
+git tag v1.2.3
+git push origin v1.2.3
 ```
 Vor eigenen Paketen anpassen: Autor/Publisher und die macOS-Bundle-ID in
 `python/pyproject.toml`, `python/packaging/*` und `rust/Cargo.toml`.

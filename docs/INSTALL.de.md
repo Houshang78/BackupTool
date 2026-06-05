@@ -17,7 +17,7 @@ Release-Archiv:
 ./rust/target/release/backuptool --help
 ./rust/target/release/backuptool-gui            # native GUI
 # aus einem Release-Archiv
-tar -xzf backuptool-v1.2.2-linux-x86_64.tar.gz  # oder Windows-.zip entpacken
+tar -xzf backuptool-v1.2.3-linux-x86_64.tar.gz  # oder Windows-.zip entpacken
 ./backuptool --help
 ./backuptool-gui
 ```
@@ -43,7 +43,7 @@ Unter Windows ist der PyInstaller-Build eine einzige portable Datei — einfach
 
 ### Linux (.deb)
 ```bash
-sudo apt install ./backuptool_1.2.2_all.deb
+sudo apt install ./backuptool_1.2.3_all.deb
 backuptool --help          # CLI
 backuptool gui             # GUI (oder Menüeintrag „backuptool")
 ```
@@ -52,7 +52,7 @@ Braucht `python3-pyside6` für die GUI (`sudo apt install python3-pyside6` oder
 
 ### macOS (.pkg oder .app)
 ```bash
-sudo installer -pkg backuptool-1.2.2.pkg -target /     # CLI nach /usr/local/bin
+sudo installer -pkg backuptool-1.2.3.pkg -target /     # CLI nach /usr/local/bin
 backuptool --help
 ```
 Oder `backuptool.app` doppelklicken (GUI). In beiden Fällen einmalig:
@@ -61,7 +61,7 @@ Oder `backuptool.app` doppelklicken (GUI). In beiden Fällen einmalig:
 
 ### Windows (.exe / Setup)
 - Portabel: einfach `backuptool.exe` behalten und starten.
-- Installer: `backuptool-setup-1.2.2.exe` (Inno Setup) ausführen — bietet
+- Installer: `backuptool-setup-1.2.3.exe` (Inno Setup) ausführen — bietet
   Startmenü-Eintrag, optionales Desktop-Symbol und optionales Hinzufügen zur `PATH`.
   Deinstallieren über *Einstellungen → Apps*.
 

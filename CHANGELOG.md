@@ -2,6 +2,14 @@
 
 All notable changes to this project. Versions follow [Semantic Versioning](https://semver.org).
 
+## [1.2.3]
+### Added
+- **More CPU architectures** for the Rust release binaries, each built on its
+  own native runner: **Linux ARM64**, **macOS Intel (x86-64)** and
+  **Windows ARM64** — in addition to the existing Linux x86-64, macOS Apple
+  Silicon and Windows x86-64. (The Python `.deb` is `Architecture: all` and
+  already runs on any arch.)
+
 ## [1.2.2]
 ### Fixed
 - Linux Rust binaries failed on older systems with

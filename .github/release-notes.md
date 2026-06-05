@@ -8,11 +8,14 @@ unencrypted backups):
 Built-in encryption (AES-256-GCM / ChaCha20-Poly1305), native Slint GUI,
 nothing else to install.
 
-| OS | File |
-|----|------|
+| OS / arch | File |
+|-----------|------|
 | Linux x86-64 | `backuptool-<tag>-linux-x86_64-rust.tar.gz` |
-| macOS (Apple Silicon) | `backuptool-<tag>-macos-arm64-rust.tar.gz` |
+| Linux ARM64 | `backuptool-<tag>-linux-arm64-rust.tar.gz` |
+| macOS Intel (x86-64) | `backuptool-<tag>-macos-x86_64-rust.tar.gz` |
+| macOS Apple Silicon | `backuptool-<tag>-macos-arm64-rust.tar.gz` |
 | Windows x86-64 | `backuptool-<tag>-windows-x86_64-rust.zip` |
+| Windows ARM64 | `backuptool-<tag>-windows-arm64-rust.zip` |
 
 ### 🐍 Python — native OS installer, Qt6 GUI
 Needs Python 3. The CLI runs on the standard library alone; the GUI needs
