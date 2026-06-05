@@ -28,6 +28,11 @@ chmod 755 "$BUILD/usr/bin/backuptool"
 # Desktop entry (GUI in the application menu)
 install -d "$BUILD/usr/share/applications"
 cp "$ROOT/packaging/backuptool.desktop" "$BUILD/usr/share/applications/"
+cp "$ROOT/packaging/backuptool-admin.desktop" "$BUILD/usr/share/applications/"
+
+# Admin launcher: runs the GUI with root rights but keeps the desktop session,
+# so file dialogs work (plain `sudo backuptool-gui` breaks them).
+install -m 755 "$ROOT/../scripts/backuptool-gui-admin" "$BUILD/usr/bin/backuptool-gui-admin"
 
 # Application icon (hicolor theme, referenced by Icon=backuptool in the .desktop)
 for size in 16 32 48 64 128 256 512; do

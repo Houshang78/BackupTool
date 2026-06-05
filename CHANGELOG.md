@@ -2,6 +2,16 @@
 
 All notable changes to this project. Versions follow [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+### Added
+- **Run the GUI as administrator without breaking the file dialogs.** Launching
+  the GUI plainly under `sudo` left the folder pickers dead (root cannot reach the
+  user D-Bus/X session). New `backuptool-gui-admin` launcher elevates via `pkexec`
+  (sudo fallback) while passing the desktop session through, plus a
+  "backuptool (Administrator)" menu entry in the `.deb`. Both GUIs also detect
+  root at startup and hint to type paths into the (editable) fields if a dialog
+  still cannot open.
+
 ## [1.2.3]
 ### Added
 - **More CPU architectures** for the Rust release binaries, each built on its
