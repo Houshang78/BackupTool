@@ -48,6 +48,15 @@ enum Cmd {
         /// encryption: none | aes256gcm | chacha20poly1305
         #[arg(long, default_value = "none")]
         cipher: String,
+        /// also back up this UID/username's home/data dir (repeatable)
+        #[arg(long)]
+        uid: Vec<String>,
+        /// dump a database into the set: postgresql|mysql|redis|mongodb|all
+        #[arg(long)]
+        db: Vec<String>,
+        /// generic DB dump (e.g. Oracle): NAME=command, runs with $BACKUPTOOL_DB_OUT
+        #[arg(long = "db-command")]
+        db_command: Vec<String>,
     },
     /// Restore
     Restore {
@@ -72,6 +81,8 @@ enum Cmd {
     },
     /// List auto-detected sources and destinations
     Discover,
+    /// List databases that can be dumped
+    Databases,
 }
 
 fn default_workers() -> usize {
@@ -119,7 +130,7 @@ fn make_bar() -> ProgressBar {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
-        Cmd::Backup { sources, dest, set, workers, checksum, exclude, delete, system, no_system, dry_run, cipher } => {
+        Cmd::Backup { sources, dest, set, workers, checksum, exclude, delete, system, no_system, dry_run, cipher, uid, db, db_command } => {
             if sources.is_empty() {
                 return Err(anyhow!("Provide at least one source."));
             }
@@ -127,6 +138,16 @@ fn main() -> Result<()> {
             let passphrase = if cipher != Cipher::None { Some(ask_passphrase(true)?) } else { None };
             let set = set.unwrap_or_else(|| gethostname::gethostname().to_string_lossy().into_owned());
             let include_system = if no_system { false } else { system || is_root() };
+
+            let mut sources = sources;
+            for u in &uid {                       // add other users' / service data dirs
+                match backuptool::discover::resolve_uid(u) {
+                    Some(d) => { println!("UID {u} -> {d}"); if !sources.contains(&d) { sources.push(d); } }
+                    None => println!("UID {u}: no home/data dir found"),
+                }
+            }
+
+            let (dest_for_db, set_for_db) = (dest.clone(), set.clone());
             let opt = BackupOptions {
                 sources, dest, set,
                 workers: workers.unwrap_or_else(default_workers),
@@ -138,6 +159,31 @@ fn main() -> Result<()> {
             let prog = |d: u64, t: u64| { bar.set_length(t); bar.set_position(d); };
             let stats = engine::backup(&opt, prog, log)?;
             bar.finish_and_clear();
+
+            if !dry_run && (!db.is_empty() || !db_command.is_empty()) {
+                use backuptool::dbdump;
+                let mut specs: Vec<dbdump::DbSpec> = Vec::new();
+                if !db.is_empty() {
+                    let detected = dbdump::detect_databases();
+                    if db.iter().any(|d| d == "all") {
+                        specs.extend(detected);
+                    } else {
+                        for want in &db {
+                            specs.extend(detected.iter().filter(|d| &d.name == want || &d.kind == want).cloned());
+                        }
+                    }
+                }
+                for item in &db_command {
+                    if let Some((n, c)) = item.split_once('=') {
+                        specs.push(dbdump::DbSpec { name: n.into(), kind: "generic".into(), shell: Some(c.into()) });
+                    }
+                }
+                if !specs.is_empty() {
+                    let out_dir = std::path::Path::new(&dest_for_db).join(&set_for_db).join(dbdump::DB_DIR);
+                    println!("Dumping {} database(s) -> {}", specs.len(), out_dir.display());
+                    dbdump::dump_all(&specs, &out_dir, &|m: &str| println!("{m}"));
+                }
+            }
             if stats.errors > 0 { std::process::exit(1); }
         }
         Cmd::Restore { source, set, target, workers, no_meta, dry_run } => {
@@ -177,6 +223,19 @@ fn main() -> Result<()> {
             }
             println!("Suggested destination: {}",
                 discover::default_destination().unwrap_or_else(|| "(none)".into()));
+        }
+        Cmd::Databases => {
+            let dbs = backuptool::dbdump::detect_databases();
+            if dbs.is_empty() {
+                println!("No supported databases detected.");
+            } else {
+                println!("Detected databases:");
+                for d in dbs {
+                    println!("  {:12} ({})", d.kind, d.name);
+                }
+                println!("Dump with:       backuptool backup ... --db all");
+                println!("Generic/Oracle:  backuptool backup ... --db-command 'oracle=expdp ...'");
+            }
         }
         Cmd::List { dest } => {
             let sets = engine::list_sets(&dest);

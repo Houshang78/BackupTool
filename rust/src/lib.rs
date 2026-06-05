@@ -10,4 +10,5 @@ pub mod manifest;
 pub mod crypto;
 pub mod engine;
 pub mod discover;
+pub mod dbdump;
 pub mod i18n;

@@ -161,6 +161,20 @@ def detect_destinations() -> list:
     return []
 
 
+def resolve_uid(uid_or_name) -> str:
+    """Resolve a UID or username to its home/data directory ('' if none).
+    Used to also back up another user's (or a service account's) data."""
+    if not sys.platform.startswith(("linux", "darwin")):
+        return ""
+    import pwd
+    try:
+        s = str(uid_or_name).strip()
+        e = pwd.getpwuid(int(s)) if s.isdigit() else pwd.getpwnam(s)
+    except (KeyError, ValueError):
+        return ""
+    return e.pw_dir if os.path.isdir(e.pw_dir) else ""
+
+
 def default_destination() -> str:
     """Best default destination: USB first, then external disk, then network."""
     dests = detect_destinations()

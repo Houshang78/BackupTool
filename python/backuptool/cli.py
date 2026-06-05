@@ -16,16 +16,47 @@ def _add_common(p):
 
 def cmd_backup(a):
     import os
+    import socket
+    from . import discover, dbdump
     if a.system is None:  # auto: include system dirs when running as root
         include_system = hasattr(os, "geteuid") and os.geteuid() == 0
     else:
         include_system = a.system
-    return core.backup(
-        sources=a.sources, dest=a.dest, setname=a.set, workers=a.workers,
+
+    sources = list(a.sources)
+    for uid in a.uid:                       # add other users' / service data dirs
+        d = discover.resolve_uid(uid)
+        if d and d not in sources:
+            sources.append(d)
+            print(f"UID {uid} -> {d}")
+        elif not d:
+            print(f"UID {uid}: no home/data dir found")
+
+    res = core.backup(
+        sources=sources, dest=a.dest, setname=a.set, workers=a.workers,
         use_checksum=a.checksum, extra_excludes=a.exclude, prune=a.delete,
         dry_run=a.dry_run, include_system=include_system, log=print,
         progress=_progress if a.progress else None,
     )
+
+    specs = []                              # database dumps
+    if a.db:
+        detected = dbdump.detect_databases()
+        if "all" in a.db:
+            specs.extend(detected)
+        else:
+            for want in a.db:
+                specs.extend(d for d in detected if want in (d["name"], d["kind"]))
+    for item in a.db_command:               # generic / Oracle: NAME=command
+        if "=" in item:
+            name, cmd = item.split("=", 1)
+            specs.append({"name": name, "shell": cmd})
+    if specs and not a.dry_run:
+        setname = a.set or socket.gethostname()
+        out_dir = os.path.join(os.path.abspath(a.dest), setname, dbdump.DB_DIR)
+        print(f"Dumping {len(specs)} database(s) -> {out_dir}")
+        dbdump.dump_all(specs, out_dir, log=print)
+    return res
 
 
 def cmd_restore(a):
@@ -44,6 +75,20 @@ def cmd_list(a):
     print(f"{'SET':24} {'HOST':16} {'CREATED':20} FILES")
     for s in sets:
         print(f"{s['set']:24} {s['host']:16} {s['created']:20} {s['files']}")
+
+
+def cmd_databases(a):
+    from . import dbdump
+    dbs = dbdump.detect_databases()
+    if not dbs:
+        print("No supported databases detected.")
+        return
+    print("Detected databases:")
+    for d in dbs:
+        print(f"  {d['kind']:12} ({d['name']})")
+    print("Dump into a backup with:  backuptool backup ... --db all")
+    print("Generic/Oracle:           backuptool backup ... "
+          "--db-command 'oracle=expdp ...'")
 
 
 def cmd_discover(a):
@@ -91,6 +136,12 @@ def build_parser():
     b.add_argument("--no-system", dest="system", action="store_false",
                    help="do not include system dirs even when running as root")
     b.add_argument("--progress", action="store_true", help="show progress")
+    b.add_argument("--uid", action="append", default=[], metavar="UID",
+                   help="also back up this UID/username's home/data dir (repeatable)")
+    b.add_argument("--db", action="append", default=[], metavar="NAME",
+                   help="dump a database into the set: postgresql|mysql|redis|mongodb|all")
+    b.add_argument("--db-command", action="append", default=[], metavar="NAME=CMD",
+                   help="generic DB dump (e.g. Oracle); CMD runs with $BACKUPTOOL_DB_OUT set")
     _add_common(b)
     b.set_defaults(func=cmd_backup)
 
@@ -110,6 +161,8 @@ def build_parser():
 
     sub.add_parser("discover", help="list auto-detected sources and destinations") \
        .set_defaults(func=cmd_discover)
+    sub.add_parser("databases", help="list databases that can be dumped") \
+       .set_defaults(func=cmd_databases)
 
     g = sub.add_parser("gui", help="launch the graphical interface")
     g.set_defaults(func=lambda a: _launch_gui())

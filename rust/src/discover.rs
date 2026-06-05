@@ -188,6 +188,34 @@ pub fn default_destination() -> Option<String> {
     None
 }
 
+/// Resolve a UID or username to its home/data directory (reads /etc/passwd).
+/// Used to also back up another user's or a service account's data.
+#[cfg(unix)]
+pub fn resolve_uid(uid_or_name: &str) -> Option<String> {
+    let txt = std::fs::read_to_string("/etc/passwd").ok()?;
+    let want = uid_or_name.trim();
+    let want_uid: Option<u32> = want.parse().ok();
+    for line in txt.lines() {
+        let f: Vec<&str> = line.split(':').collect();
+        if f.len() < 7 {
+            continue;
+        }
+        let uid: u32 = f[2].parse().unwrap_or(u32::MAX);
+        let matches = match want_uid {
+            Some(u) => u == uid,
+            None => f[0] == want,
+        };
+        if matches {
+            return if Path::new(f[5]).is_dir() { Some(f[5].to_string()) } else { None };
+        }
+    }
+    None
+}
+#[cfg(not(unix))]
+pub fn resolve_uid(_uid_or_name: &str) -> Option<String> {
+    None
+}
+
 #[derive(Clone, Debug)]
 pub struct Overlap {
     pub path: String,
