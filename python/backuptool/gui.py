@@ -10,6 +10,7 @@ Requires:  pip install PySide6
 """
 from __future__ import annotations
 
+import os
 import socket
 import sys
 
@@ -59,6 +60,7 @@ class MainWindow(QMainWindow):
         self.tr_ = Translator("en")
         self._thread = None
         self._worker = None
+        self._is_root = hasattr(os, "geteuid") and os.geteuid() == 0
         self.resize(820, 700)
 
         central = QWidget()
@@ -301,7 +303,11 @@ class MainWindow(QMainWindow):
         self.cb_meta.setText(t("reapply_meta"))
         self.cb_r_dry.setText(t("opt_dryrun"))
         self.btn_start_restore.setText(t("start_restore"))
-        if not self.status.text():
+        # Under root the native file dialog often cannot open (no user portal);
+        # hint the user to type paths into the fields instead.
+        if self._is_root:
+            self.status.setText(t("root_hint"))
+        elif not self.status.text():
             self.status.setText(t("ready"))
 
     # -------------------------------------------------------------- runner

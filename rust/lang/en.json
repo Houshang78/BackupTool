@@ -22,6 +22,7 @@
   "start_backup": "Start backup",
   "running": "running ...",
   "ready": "Ready.",
+  "root_hint": "Running as root: the file dialog may not open — type paths into the fields.",
   "backup_folder": "Backup folder:",
   "backup_set": "Backup set:",
   "load_sets": "Load sets",

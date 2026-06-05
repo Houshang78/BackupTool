@@ -69,8 +69,17 @@ where
     });
 }
 
+#[cfg(unix)]
+fn is_root_user() -> bool {
+    unsafe { libc::geteuid() == 0 }
+}
+#[cfg(not(unix))]
+fn is_root_user() -> bool {
+    false
+}
+
 /// Apply all translated label texts for the given language code.
-fn apply_language(ui: &MainWindow, i18n: &I18n, code: &str) {
+fn apply_language(ui: &MainWindow, i18n: &I18n, code: &str, is_root: bool) {
     let t = |k: &str| i18n.tr(code, k);
     ui.set_rtl(i18n.is_rtl(code));
     ui.set_win_title(format!("backuptool — {}", i18n.name_of(code)).into());
@@ -98,7 +107,9 @@ fn apply_language(ui: &MainWindow, i18n: &I18n, code: &str) {
     ui.set_t_target(t("target_root").into());
     ui.set_t_reapply(t("reapply_meta").into());
     ui.set_t_start_restore(t("start_restore").into());
-    ui.set_status(t("ready").into());
+    // Under root the native folder dialog usually cannot open (no user D-Bus /
+    // portal); tell the user to type paths into the fields instead.
+    ui.set_status(if is_root { t("root_hint") } else { t("ready") }.into());
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -112,7 +123,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let default_idx = codes.iter().position(|c| c == "en").unwrap_or(0);
     let current = Rc::new(RefCell::new(codes.get(default_idx).cloned().unwrap_or_else(|| "en".into())));
     ui.set_lang_index(default_idx as i32);
-    apply_language(&ui, &i18n, &current.borrow());
+    let is_root = is_root_user();
+    apply_language(&ui, &i18n, &current.borrow(), is_root);
 
     ui.set_setname(gethostname::gethostname().to_string_lossy().into_owned().into());
     let cores = std::thread::available_parallelism().map(|n| n.get() as i32).unwrap_or(4);
@@ -128,7 +140,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui.on_language_changed(move |idx| {
             if let (Some(ui), Some(code)) = (weak.upgrade(), codes.get(idx as usize)) {
                 *current.borrow_mut() = code.clone();
-                apply_language(&ui, &i18n, code);
+                apply_language(&ui, &i18n, code, is_root);
             }
         });
     }
