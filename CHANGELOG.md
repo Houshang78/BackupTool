@@ -2,6 +2,34 @@
 
 All notable changes to this project. Versions follow [Semantic Versioning](https://semver.org).
 
+## [1.6.0]
+### Added
+This release **unifies two parallel development lines** that had diverged after
+1.1.0 into a single feature set, in both the Python and Rust implementations:
+
+- From the published **1.2.x** line:
+  - **Auto-discovery** of sources and destinations (`discover` command / GUI "Auto"
+    button; USB/external/network destination detection).
+  - **Database dumps** during a backup (`databases` command, `--db`/`--db-command`
+    and connection flags; PostgreSQL/MySQL/Redis/MongoDB native + a generic adapter
+    for Oracle/MS-SQL). GUI Databases section.
+  - **Overlap-aware sources** + an "Extra paths/files" field, and **UID inclusion**
+    (`--uid`).
+- From the **1.3–1.5** line:
+  - **Selectable per-file encryption** split into its own `crypto` module.
+  - **Decommission** workflow: evacuate (copy + verify), optional move,
+    **secure-wipe**, **restore-defaults**, and platform **factory-reset** guidance.
+  - **Disk clone** (`clone` command / GUI tab) via detected tools (dd, ddrescue, …).
+  - **VSS** volume snapshots (`--vss`) and **file-locking-app** detection/close
+    (`--close-apps`).
+
+### Notes
+- Standalone/empty **directory entries are no longer recorded** in the manifest:
+  both tools now store files and symlinks only, keeping the Python and Rust
+  manifests interchangeable (the Rust `Kind` enum is `File | Symlink`). This drops
+  the 1.2.x empty-directory backup behaviour (the corresponding test is skipped
+  with a note); re-enabling it would require a `Dir` kind in both implementations.
+
 ## [1.2.4]
 ### Added
 - **UID inclusion + database dumps** (both implementations, CLI **and GUI**). A

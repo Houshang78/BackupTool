@@ -12,3 +12,6 @@ pub mod engine;
 pub mod discover;
 pub mod dbdump;
 pub mod i18n;
+pub mod reset;
+pub mod vss;
+pub mod procs;

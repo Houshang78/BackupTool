@@ -51,7 +51,7 @@ backuptool gui             # GUI (یا ورودی منوی «backuptool»)
 
 ### مک (.pkg یا .app)
 ```bash
-sudo installer -pkg backuptool-1.2.4.pkg -target /     # CLI در /usr/local/bin
+sudo installer -pkg backuptool-1.6.0.pkg -target /     # CLI در /usr/local/bin
 backuptool --help
 ```
 یا روی `backuptool.app` دابل‌کلیک کنید (GUI). در هر دو حالت یک‌بار:
@@ -60,7 +60,7 @@ backuptool --help
 
 ### ویندوز (.exe / Setup)
 - پرتابل: کافی است `backuptool.exe` را نگه دارید و اجرا کنید.
-- نصب‌کننده: `backuptool-setup-1.2.4.exe` (Inno Setup) را اجرا کنید — ورودیِ منوی
+- نصب‌کننده: `backuptool-setup-1.6.0.exe` (Inno Setup) را اجرا کنید — ورودیِ منوی
   استارت، آیکن دسکتاپِ اختیاری و افزودنِ اختیاری CLI به `PATH`. حذف از
   *Settings → Apps*.
 

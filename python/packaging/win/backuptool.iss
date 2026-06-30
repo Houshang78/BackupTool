@@ -3,7 +3,7 @@
 ; Prerequisite: dist\backuptool.exe was built beforehand with build-windows.ps1.
 
 #define MyAppName "backuptool"
-#define MyAppVersion "1.2.4"
+#define MyAppVersion "1.6.0"
 #define MyAppPublisher "Atie"
 #define MyAppAuthor "Houshang Pezeshkpour"
 #define MyAppContact "houshang@pezeshkpour.eu"
@@ -24,8 +24,6 @@ Compression=lzma2
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64
 ChangesEnvironment=yes
-SetupIconFile=backuptool.ico
-UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Languages]
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
@@ -39,11 +37,10 @@ Name: "addtopath"; Description: "Add backuptool to the PATH (use the CLI from an
 ; A single portable file (built with --onefile). For --onedir, include the whole folder instead:
 ;   Source: "..\..\dist\backuptool\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\..\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "backuptool.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\backuptool.ico"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\backuptool.ico"; Tasks: desktopicon
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Registry]
 ; Extend PATH (only if the task is selected)

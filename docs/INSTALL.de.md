@@ -52,7 +52,7 @@ Braucht `python3-pyside6` für die GUI (`sudo apt install python3-pyside6` oder
 
 ### macOS (.pkg oder .app)
 ```bash
-sudo installer -pkg backuptool-1.2.4.pkg -target /     # CLI nach /usr/local/bin
+sudo installer -pkg backuptool-1.6.0.pkg -target /     # CLI nach /usr/local/bin
 backuptool --help
 ```
 Oder `backuptool.app` doppelklicken (GUI). In beiden Fällen einmalig:
@@ -61,7 +61,7 @@ Oder `backuptool.app` doppelklicken (GUI). In beiden Fällen einmalig:
 
 ### Windows (.exe / Setup)
 - Portabel: einfach `backuptool.exe` behalten und starten.
-- Installer: `backuptool-setup-1.2.4.exe` (Inno Setup) ausführen — bietet
+- Installer: `backuptool-setup-1.6.0.exe` (Inno Setup) ausführen — bietet
   Startmenü-Eintrag, optionales Desktop-Symbol und optionales Hinzufügen zur `PATH`.
   Deinstallieren über *Einstellungen → Apps*.
 

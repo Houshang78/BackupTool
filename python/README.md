@@ -72,7 +72,7 @@ the manifest and are recreated on restore on a capable filesystem.
 ## Packaging
 
 ```bash
-bash packaging/build-deb.sh        # Linux  -> dist/backuptool_1.2.4_all.deb
+bash packaging/build-deb.sh        # Linux  -> dist/backuptool_1.6.0_all.deb
 bash packaging/build-macos.sh      # macOS  -> backuptool.app + .pkg
 powershell -File packaging\build-windows.ps1   # Windows -> dist\backuptool.exe
 pip install .                      # dev install (entry points: backuptool, backuptool-gui)

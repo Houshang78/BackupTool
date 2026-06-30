@@ -38,6 +38,12 @@ class TestCore(unittest.TestCase):
         self.assertIn("a.txt", restored)
         self.assertIn("b.txt", restored)
 
+    @unittest.skip(
+        "Empty/standalone directory entries were dropped from the manifest in the "
+        "1.5.x line so the Python and Rust tools stay manifest-compatible (Rust's "
+        "Kind enum is File|Symlink only). Both tools record files and symlinks, not "
+        "bare directories. Re-enabling empty-dir backup would require adding a Dir "
+        "kind to both implementations.")
     def test_empty_dir_roundtrip(self):
         os.makedirs(os.path.join(self.src, "empty"))
         core.backup([self.src], self.dst, setname="t", log=_silent)
@@ -94,6 +100,104 @@ class TestCore(unittest.TestCase):
     def test_system_dirs_exist(self):
         for d in core.system_dirs():
             self.assertTrue(os.path.isdir(d))
+
+    def test_suggested_dest(self):
+        d = core.suggested_dest()
+        self.assertIn("backuptool-", d)
+        self.assertTrue(os.path.isabs(d))
+
+    def test_to_rel_relative(self):
+        self.assertEqual(core._to_rel("/Users/x/file"), "Users/x/file")
+        self.assertEqual(core._to_rel("\\\\?\\C:\\Users\\x"), "C\\Users\\x")
+        self.assertEqual(core._to_rel("D:\\data\\f"), "D\\data\\f")
+        self.assertEqual(core._to_rel("C:/Users/x"), "C/Users/x")
+
+    def test_running_blockers_list(self):
+        from backuptool import procs
+        self.assertIsInstance(procs.running_blockers(), list)
+
+    def test_auto_sources(self):
+        a = core.auto_sources()
+        self.assertIsInstance(a, list)
+        self.assertTrue(a)  # home exists on the dev box
+        self.assertEqual(core.scope_sources("auto", []), a)
+
+    def test_volume_root_detection(self):
+        for p in ("/", "C:\\", "C:", "\\\\?\\C:\\"):
+            self.assertTrue(core._is_volume_root(p), p)
+        for p in ("/home/user", "C:\\Users", "/Volumes/Stick"):
+            self.assertFalse(core._is_volume_root(p), p)
+
+    def test_disk_excludes_windows_keeps_userdata(self):
+        from unittest import mock
+        with mock.patch("sys.platform", "win32"):
+            ex = core.disk_excludes()
+        self.assertTrue(any("Windows" in p for p in ex))
+        self.assertTrue(any("Program Files" in p for p in ex))
+        # user data must NOT be excluded
+        self.assertFalse(any("Users" in p for p in ex))
+
+    def test_scope_sources(self):
+        self.assertRaises(ValueError, core.scope_sources, "config", [])
+        self.assertEqual(core.scope_sources("config", ["/x"]), ["/x"])
+        self.assertRaises(ValueError, core.scope_sources, "bogus", [])
+
+    def test_verify_detects_corruption(self):
+        core.backup([self.src], self.dst, setname="v", use_checksum=True, log=_silent)
+        set_root = os.path.join(self.dst, "v")
+        good = core.verify_set(set_root, log=_silent)
+        self.assertEqual(good["errors"], 0)
+        # corrupt one copied file at the destination
+        with open(os.path.join(set_root, self.src.lstrip("/"), "a.txt"), "w") as f:
+            f.write("tampered")
+        bad = core.verify_set(set_root, log=_silent)
+        self.assertEqual(bad["errors"], 1)
+
+    def test_evacuate_moves_and_verifies(self):
+        dest = os.path.join(self.tmp, "evac")
+        report = core.evacuate(
+            sources=[self.src], dest=dest, setname="e", scope="config",
+            delete_source=True, allow_same_device=True, log=_silent)
+        self.assertEqual(report["scanned"], 2)
+        self.assertEqual(report["verified"], 2)
+        self.assertEqual(report["verify_errors"], 0)
+        self.assertEqual(report["deleted"], 2)
+        # sources gone, verified copies remain
+        self.assertFalse(os.path.exists(os.path.join(self.src, "a.txt")))
+        v = core.verify_set(os.path.join(dest, "e"), log=_silent)
+        self.assertEqual(v["errors"], 0)
+
+    def test_evacuate_dry_run_keeps_sources(self):
+        dest = os.path.join(self.tmp, "evacdry")
+        report = core.evacuate(
+            sources=[self.src], dest=dest, setname="e", scope="config",
+            delete_source=True, allow_same_device=True, dry_run=True, log=_silent)
+        self.assertEqual(report["deleted"], 0)
+        self.assertTrue(os.path.exists(os.path.join(self.src, "a.txt")))
+
+    def test_evacuate_refuses_same_device(self):
+        dest = os.path.join(self.tmp, "evac2")
+        self.assertRaises(
+            RuntimeError, core.evacuate,
+            sources=[self.src], dest=dest, setname="e", scope="config",
+            delete_source=True, allow_same_device=False, log=_silent)
+
+    def test_evacuate_secure_wipe(self):
+        dest = os.path.join(self.tmp, "evacwipe")
+        report = core.evacuate(
+            sources=[self.src], dest=dest, setname="w", scope="config",
+            delete_source=True, secure_wipe=True, wipe_passes=2,
+            allow_same_device=True, log=_silent)
+        self.assertEqual(report["deleted"], 2)
+        self.assertEqual(report["wiped"], 2)
+        self.assertFalse(os.path.exists(os.path.join(self.src, "a.txt")))
+        v = core.verify_set(os.path.join(dest, "w"), log=_silent)
+        self.assertEqual(v["errors"], 0)
+
+    def test_secure_overwrite_truncates(self):
+        p = os.path.join(self.src, "a.txt")
+        core.secure_overwrite(p, passes=2)
+        self.assertEqual(os.path.getsize(p), 0)
 
 
 if __name__ == "__main__":

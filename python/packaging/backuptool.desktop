@@ -4,6 +4,6 @@ Name=backuptool
 Comment=Cross-platform parallel backup tool
 Comment[de]=Plattformübergreifendes paralleles Backup-Tool
 Exec=backuptool gui
-Icon=backuptool
+Icon=drive-harddisk
 Terminal=false
 Categories=Utility;System;Archiving;

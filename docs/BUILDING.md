@@ -88,8 +88,8 @@ via `pip3 install PySide6`). The Windows `.exe` bundles PySide6.
 Pushing a tag runs `.github/workflows/release.yml`, which builds the same artifacts
 on GitHub-hosted Linux/macOS/Windows runners and attaches them to the GitHub Release:
 ```bash
-bash scripts/bump-version.sh 1.2.4     # bump version everywhere + CHANGELOG stub
-git commit -am "Bump version to 1.2.4"
+bash scripts/bump-version.sh 1.6.0     # bump version everywhere + CHANGELOG stub
+git commit -am "Bump version to 1.6.0"
 git tag -a v1.2.4 -m "backuptool v1.2.4"
 git push --follow-tags                 # triggers the Release workflow
 ```
