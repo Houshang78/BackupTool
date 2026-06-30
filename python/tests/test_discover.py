@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Unit tests for the discovery helpers."""
 import os
+import sys
 import unittest
 
 from backuptool import discover
@@ -23,7 +24,7 @@ class TestDiscover(unittest.TestCase):
     def test_default_destination_is_str(self):
         self.assertIsInstance(discover.default_destination(), str)
 
-    @unittest.skipUnless(os.path.isdir("/etc"), "Linux/Unix only")
+    @unittest.skipUnless(sys.platform.startswith("linux"), "/etc config source is Linux-specific")
     def test_etc_is_a_config_source(self):
         src = discover.user_data_sources()
         self.assertTrue(any(c["path"] == "/etc" and c["kind"] == "config" for c in src))
