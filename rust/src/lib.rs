@@ -10,3 +10,6 @@ pub mod manifest;
 pub mod crypto;
 pub mod engine;
 pub mod i18n;
+pub mod reset;
+pub mod vss;
+pub mod procs;

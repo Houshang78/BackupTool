@@ -9,14 +9,13 @@ use std::path::Path;
 
 pub const MANIFEST_NAME: &str = ".backuptool-manifest.json";
 
-/// Entry kind. Serializes as the lowercase strings "file" / "symlink" / "dir",
+/// Entry kind. Serializes as the lowercase strings "file" / "symlink",
 /// keeping the manifest format identical across the Python and Rust tools.
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
     File,
     Symlink,
-    Dir,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

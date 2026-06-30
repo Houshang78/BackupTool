@@ -10,7 +10,7 @@ Requires:  pip install PySide6
 """
 from __future__ import annotations
 
-import os
+import functools
 import socket
 import sys
 
@@ -25,8 +25,55 @@ try:
 except ImportError as e:  # handled by __main__ -> falls back to the CLI
     raise ImportError("PySide6 is not installed. Run:  pip install PySide6") from e
 
-from . import __version__, core
+from . import __version__, core, crypto, reset
 from .i18n import Translator, available
+
+
+def _decommission_job(defaults=None, def_pw=None, **kw):
+    """Worker entry point: evacuate, then optionally restore factory defaults,
+    then log the manual reset instructions."""
+    rep = core.evacuate(**kw)
+    log = kw.get("log", print)
+    if defaults and not kw.get("dry_run") and rep.get("delete_errors", 0) == 0:
+        ddir, dset, dtgt = defaults
+        core.restore(backup_dir=ddir, setname=dset, target=dtgt,
+                     workers=kw.get("workers"), reapply_meta=True, dry_run=False,
+                     passphrase=def_pw, log=log, progress=kw.get("progress"))
+    log(reset.instructions())
+    return rep
+
+
+def _backup_job(do_vss=False, **kw):
+    """Worker entry point: optionally VSS-snapshot first, then back up, then clean up."""
+    from . import vss as _vss
+    log = kw.get("log", print)
+    shadow_ids = []
+    if do_vss and not kw.get("dry_run"):
+        try:
+            src, vmap, shadow_ids = _vss.prepare(kw.get("sources", []))
+            for dev, vol in vmap:
+                log(f"VSS snapshot of {vol}: {dev.rstrip(chr(92))}")
+            kw["sources"] = src
+            kw["vss_map"] = vmap
+        except Exception as e:  # noqa: BLE001
+            log(f"VSS unavailable ({e}); continuing without snapshot.")
+    try:
+        return core.backup(**kw)
+    finally:
+        for sid in shadow_ids:
+            _vss.remove(sid)
+
+
+def _clone_job(argv=None, dry=False, **kw):
+    """Worker entry point: run (or preview) a clone command."""
+    log = kw.get("log", print)
+    if dry:
+        log("[dry-run] would run: " + " ".join(argv))
+        return 0
+    log("Running: " + " ".join(argv))
+    code = reset.run_command(argv)
+    log(f"clone exited with code {code}")
+    return code
 
 
 class Worker(QObject):
@@ -60,7 +107,6 @@ class MainWindow(QMainWindow):
         self.tr_ = Translator("en")
         self._thread = None
         self._worker = None
-        self._is_root = hasattr(os, "geteuid") and os.geteuid() == 0
         self.resize(820, 700)
 
         central = QWidget()
@@ -83,6 +129,8 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_backup_tab(), "")
         self.tabs.addTab(self._build_restore_tab(), "")
+        self.tabs.addTab(self._build_decommission_tab(), "")
+        self.tabs.addTab(self._build_clone_tab(), "")
         outer.addWidget(self.tabs)
 
         self.progress = QProgressBar()
@@ -110,15 +158,16 @@ class MainWindow(QMainWindow):
         self.btn_add_dir = QPushButton(); self.btn_add_dir.clicked.connect(self._add_dir)
         self.btn_add_file = QPushButton(); self.btn_add_file.clicked.connect(self._add_file)
         self.btn_remove = QPushButton(); self.btn_remove.clicked.connect(self._rm_src)
+        self.btn_auto = QPushButton(); self.btn_auto.clicked.connect(self._auto_src)
         row.addWidget(self.btn_add_dir); row.addWidget(self.btn_add_file)
-        row.addWidget(self.btn_remove); row.addStretch(1)
+        row.addWidget(self.btn_remove); row.addWidget(self.btn_auto); row.addStretch(1)
         gl.addLayout(row)
         lay.addWidget(self.gb_sources)
 
         grid = QGridLayout()
         self.lbl_dest = QLabel()
         grid.addWidget(self.lbl_dest, 0, 0)
-        self.dest = QLineEdit()
+        self.dest = QLineEdit(core.suggested_dest())
         grid.addWidget(self.dest, 0, 1)
         self.btn_dest = QPushButton(); self.btn_dest.clicked.connect(lambda: self._pick_dir(self.dest))
         grid.addWidget(self.btn_dest, 0, 2)
@@ -146,8 +195,9 @@ class MainWindow(QMainWindow):
         self.cb_delete = QCheckBox()
         self.cb_system = QCheckBox()
         self.cb_dry = QCheckBox()
+        self.cb_vss = QCheckBox()
         lay.addWidget(self.cb_checksum); lay.addWidget(self.cb_delete)
-        lay.addWidget(self.cb_system); lay.addWidget(self.cb_dry)
+        lay.addWidget(self.cb_system); lay.addWidget(self.cb_dry); lay.addWidget(self.cb_vss)
 
         self.btn_start_backup = QPushButton()
         self.btn_start_backup.clicked.connect(self._start_backup)
@@ -168,6 +218,11 @@ class MainWindow(QMainWindow):
     def _rm_src(self):
         for it in self.sources.selectedItems():
             self.sources.takeItem(self.sources.row(it))
+
+    def _auto_src(self):
+        self.sources.clear()
+        for p in core.auto_sources():
+            self.sources.addItem(p)
 
     def _pick_dir(self, line: QLineEdit):
         d = QFileDialog.getExistingDirectory(self, self.tr_("choose"))
@@ -190,7 +245,33 @@ class MainWindow(QMainWindow):
             prune=self.cb_delete.isChecked(), dry_run=self.cb_dry.isChecked(),
             include_system=self.cb_system.isChecked(),
         )
-        self._run(core.backup, kwargs, self.tr_("tab_backup"))
+        # Warn / offer to close apps that hold files open.
+        from . import procs
+        import time
+        blockers = procs.running_blockers()
+        if blockers:
+            t = self.tr_
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Warning)
+            box.setWindowTitle(t("apps_title"))
+            box.setText(t("apps_msg") + "\n\n" + ", ".join(blockers))
+            b_close = box.addButton(t("close_apps"), QMessageBox.AcceptRole)
+            box.addButton(t("continue_anyway"), QMessageBox.DestructiveRole)
+            b_cancel = box.addButton(QMessageBox.Cancel)
+            box.exec()
+            clicked = box.clickedButton()
+            if clicked is b_cancel:
+                return
+            if clicked is b_close:
+                procs.close_apps()
+                time.sleep(2)
+                still = procs.running_blockers()
+                if still:
+                    QMessageBox.information(self, t("apps_title"),
+                                           t("apps_msg") + "\n\n" + ", ".join(still))
+
+        func = functools.partial(_backup_job, do_vss=self.cb_vss.isChecked())
+        self._run(func, kwargs, self.tr_("tab_backup"))
 
     # ---------------------------------------------------------- Restore tab
     def _build_restore_tab(self) -> QWidget:
@@ -262,6 +343,189 @@ class MainWindow(QMainWindow):
         )
         self._run(core.restore, kwargs, self.tr_("tab_restore"))
 
+    # ------------------------------------------------------ Decommission tab
+    def _build_decommission_tab(self) -> QWidget:
+        w = QWidget()
+        grid = QGridLayout(w)
+        r = 0
+        self.lbl_d_scope = QLabel()
+        grid.addWidget(self.lbl_d_scope, r, 0)
+        self.d_scope = QComboBox(); self.d_scope.addItems(["home", "config", "disk"])
+        grid.addWidget(self.d_scope, r, 1)
+        self.d_sources = QLineEdit(); self.d_sources.setPlaceholderText("/path (scope=config/disk)")
+        grid.addWidget(self.d_sources, r, 2); r += 1
+
+        self.lbl_d_dest = QLabel()
+        grid.addWidget(self.lbl_d_dest, r, 0)
+        self.d_dest = QLineEdit(core.suggested_dest())
+        grid.addWidget(self.d_dest, r, 1)
+        self.btn_d_dest = QPushButton(); self.btn_d_dest.clicked.connect(lambda: self._pick_dir(self.d_dest))
+        grid.addWidget(self.btn_d_dest, r, 2); r += 1
+
+        self.lbl_d_set = QLabel()
+        grid.addWidget(self.lbl_d_set, r, 0)
+        self.d_set = QLineEdit(); self.d_set.setPlaceholderText(socket.gethostname() + "-decommission")
+        grid.addWidget(self.d_set, r, 1, 1, 2); r += 1
+
+        self.lbl_d_enc = QLabel()
+        grid.addWidget(self.lbl_d_enc, r, 0)
+        self.d_cipher = QComboBox(); self.d_cipher.addItems(["none", "aes256gcm", "chacha20poly1305"])
+        grid.addWidget(self.d_cipher, r, 1)
+        self.d_pass = QLineEdit(); self.d_pass.setEchoMode(QLineEdit.Password)
+        self.d_pass.setPlaceholderText("Password")
+        grid.addWidget(self.d_pass, r, 2); r += 1
+
+        self.lbl_d_action = QLabel()
+        grid.addWidget(self.lbl_d_action, r, 0)
+        self.d_action = QComboBox()
+        self.d_action.addItems(["none", "delete", "restore-defaults"])
+        grid.addWidget(self.d_action, r, 1)
+        self.lbl_d_passes = QLabel()
+        grid.addWidget(self.lbl_d_passes, r, 2)
+        self.d_passes = QSpinBox(); self.d_passes.setRange(1, 35); self.d_passes.setValue(1)
+        grid.addWidget(self.d_passes, r, 3); r += 1
+
+        self.cb_d_secure = QCheckBox()
+        grid.addWidget(self.cb_d_secure, r, 0, 1, 4); r += 1
+
+        self.lbl_d_defdir = QLabel()
+        grid.addWidget(self.lbl_d_defdir, r, 0)
+        self.d_defdir = QLineEdit()
+        grid.addWidget(self.d_defdir, r, 1)
+        self.btn_d_defdir = QPushButton(); self.btn_d_defdir.clicked.connect(lambda: self._pick_dir(self.d_defdir))
+        grid.addWidget(self.btn_d_defdir, r, 2); r += 1
+
+        self.lbl_d_defset = QLabel()
+        grid.addWidget(self.lbl_d_defset, r, 0)
+        self.d_defset = QLineEdit()
+        grid.addWidget(self.d_defset, r, 1)
+        self.lbl_d_deftgt = QLabel()
+        grid.addWidget(self.lbl_d_deftgt, r, 2)
+        self.d_deftgt = QLineEdit("/")
+        grid.addWidget(self.d_deftgt, r, 3); r += 1
+
+        self.cb_d_same = QCheckBox()
+        self.cb_d_dry = QCheckBox()
+        grid.addWidget(self.cb_d_same, r, 0, 1, 2)
+        grid.addWidget(self.cb_d_dry, r, 2, 1, 2); r += 1
+        self.cb_d_confirm = QCheckBox()
+        grid.addWidget(self.cb_d_confirm, r, 0, 1, 4); r += 1
+
+        self.btn_start_decom = QPushButton()
+        self.btn_start_decom.clicked.connect(self._start_decommission)
+        grid.addWidget(self.btn_start_decom, r, 0, 1, 4); r += 1
+        grid.setRowStretch(r, 1)
+        return w
+
+    def _start_decommission(self):
+        action = self.d_action.currentText()
+        secure_wipe = self.cb_d_secure.isChecked()
+        dry = self.cb_d_dry.isChecked()
+        # Any deletion (delete / restore-defaults / secure-overwrite) is destructive.
+        delete_source = action in ("delete", "restore-defaults") or secure_wipe
+        if delete_source and not dry and not self.cb_d_confirm.isChecked():
+            QMessageBox.warning(self, self.tr_("warning"), self.tr_("need_confirm"))
+            return
+        cipher = crypto.normalize_cipher(self.d_cipher.currentText())
+        if cipher != crypto.CIPHER_NONE:
+            if not self.d_pass.text():
+                QMessageBox.warning(self, self.tr_("missing"), self.tr_("need_password"))
+                return
+            try:
+                crypto.ensure_available()
+            except crypto.CryptoUnavailable as e:
+                QMessageBox.critical(self, self.tr_("error"), str(e))
+                return
+        scope = self.d_scope.currentText()
+        explicit = [s.strip() for s in self.d_sources.text().split(";") if s.strip()]
+        try:
+            resolved = core.scope_sources(scope, explicit)
+        except ValueError as e:
+            QMessageBox.warning(self, self.tr_("missing"), str(e))
+            return
+        if not self.d_dest.text():
+            QMessageBox.warning(self, self.tr_("missing"), self.tr_("need_dest"))
+            return
+        excludes = core.disk_excludes() if scope == "disk" else []
+        defaults = None
+        def_pw = self.d_pass.text() if cipher != crypto.CIPHER_NONE else None
+        if action == "restore-defaults":
+            if not self.d_defdir.text():
+                QMessageBox.warning(self, self.tr_("missing"), self.tr_("defaults_dir"))
+                return
+            defaults = (self.d_defdir.text(), self.d_defset.text() or None,
+                        self.d_deftgt.text() or "/")
+        kwargs = dict(
+            sources=resolved, dest=self.d_dest.text(),
+            setname=self.d_set.text() or None, workers=core.default_workers(),
+            extra_excludes=excludes, scope=scope, delete_source=delete_source,
+            allow_same_device=self.cb_d_same.isChecked(), cipher=cipher,
+            passphrase=(self.d_pass.text() if cipher != crypto.CIPHER_NONE else None),
+            secure_wipe=secure_wipe, wipe_passes=self.d_passes.value(),
+            dry_run=dry,
+        )
+        func = functools.partial(_decommission_job, defaults=defaults, def_pw=def_pw)
+        self._run(func, kwargs, self.tr_("tab_decommission"))
+
+    # ------------------------------------------------------------- Clone tab
+    def _build_clone_tab(self) -> QWidget:
+        w = QWidget()
+        grid = QGridLayout(w)
+        self.lbl_c_tool = QLabel()
+        grid.addWidget(self.lbl_c_tool, 0, 0)
+        self.c_tool = QComboBox()
+        grid.addWidget(self.c_tool, 0, 1)
+        self.btn_c_detect = QPushButton(); self.btn_c_detect.clicked.connect(self._detect_tools)
+        grid.addWidget(self.btn_c_detect, 0, 2)
+
+        self.lbl_c_src = QLabel()
+        grid.addWidget(self.lbl_c_src, 1, 0)
+        self.c_src = QLineEdit(); self.c_src.setPlaceholderText("/dev/disk2 or image.raw")
+        grid.addWidget(self.c_src, 1, 1, 1, 2)
+
+        self.lbl_c_tgt = QLabel()
+        grid.addWidget(self.lbl_c_tgt, 2, 0)
+        self.c_tgt = QLineEdit(); self.c_tgt.setPlaceholderText("/Volumes/Stick/image.raw")
+        grid.addWidget(self.c_tgt, 2, 1, 1, 2)
+
+        self.cb_c_dry = QCheckBox()
+        grid.addWidget(self.cb_c_dry, 3, 0, 1, 3)
+        self.cb_c_confirm = QCheckBox()
+        grid.addWidget(self.cb_c_confirm, 4, 0, 1, 3)
+
+        self.btn_start_clone = QPushButton()
+        self.btn_start_clone.clicked.connect(self._start_clone)
+        grid.addWidget(self.btn_start_clone, 5, 0, 1, 3)
+        grid.setRowStretch(6, 1)
+        self._detect_tools()
+        return w
+
+    def _detect_tools(self):
+        tools = reset.detect_clone_tools()
+        self.c_tool.clear()
+        self.c_tool.addItems([t["name"] for t in tools if t["available"]])
+        summary = "  ".join(f"[{'✓' if t['available'] else '—'}] {t['name']}" for t in tools)
+        if hasattr(self, "status"):  # not yet created during initial tab build
+            self.status.setText(summary)
+
+    def _start_clone(self):
+        tool = self.c_tool.currentText()
+        src, tgt = self.c_src.text(), self.c_tgt.text()
+        dry = self.cb_c_dry.isChecked()
+        if not tool or not src or not tgt:
+            QMessageBox.warning(self, self.tr_("missing"), self.tr_("need_target"))
+            return
+        if not dry and not self.cb_c_confirm.isChecked():
+            QMessageBox.warning(self, self.tr_("warning"), self.tr_("need_confirm"))
+            return
+        try:
+            argv = reset.build_clone_command(tool, src, tgt)
+        except ValueError as e:
+            QMessageBox.warning(self, self.tr_("error"), str(e))
+            return
+        func = functools.partial(_clone_job, argv=argv, dry=dry)
+        self._run(func, {}, self.tr_("tab_clone"))
+
     # --------------------------------------------------------------- i18n
     def _change_language(self, index):
         code = self.lang_combo.itemData(index)
@@ -276,11 +540,14 @@ class MainWindow(QMainWindow):
         self.lbl_language.setText(t("language"))
         self.tabs.setTabText(0, t("tab_backup"))
         self.tabs.setTabText(1, t("tab_restore"))
+        self.tabs.setTabText(2, t("tab_decommission"))
+        self.tabs.setTabText(3, t("tab_clone"))
         # backup tab
         self.gb_sources.setTitle(t("sources"))
         self.btn_add_dir.setText(t("add_folder"))
         self.btn_add_file.setText(t("add_file"))
         self.btn_remove.setText(t("remove"))
+        self.btn_auto.setText(t("auto"))
         self.lbl_dest.setText(t("dest"))
         self.btn_dest.setText(t("choose"))
         self.lbl_set.setText(t("set_name"))
@@ -291,6 +558,7 @@ class MainWindow(QMainWindow):
         self.cb_delete.setText(t("opt_delete"))
         self.cb_system.setText(t("opt_system"))
         self.cb_dry.setText(t("opt_dryrun"))
+        self.cb_vss.setText(t("opt_vss"))
         self.btn_start_backup.setText(t("start_backup"))
         # restore tab
         self.lbl_bk_folder.setText(t("backup_folder"))
@@ -303,14 +571,77 @@ class MainWindow(QMainWindow):
         self.cb_meta.setText(t("reapply_meta"))
         self.cb_r_dry.setText(t("opt_dryrun"))
         self.btn_start_restore.setText(t("start_restore"))
-        # Under root the native file dialog often cannot open (no user portal);
-        # hint the user to type paths into the fields instead.
-        if self._is_root:
-            self.status.setText(t("root_hint"))
-        elif not self.status.text():
+        # decommission tab
+        self.lbl_d_scope.setText(t("scope"))
+        self.lbl_d_dest.setText(t("dest"))
+        self.btn_d_dest.setText(t("choose"))
+        self.lbl_d_set.setText(t("set_name"))
+        self.lbl_d_enc.setText(t("encryption"))
+        self.lbl_d_action.setText(t("reset_action"))
+        self.cb_d_secure.setText(t("secure_wipe"))
+        self.lbl_d_passes.setText(t("wipe_passes"))
+        self.lbl_d_defdir.setText(t("defaults_dir"))
+        self.btn_d_defdir.setText(t("choose"))
+        self.lbl_d_defset.setText(t("defaults_set"))
+        self.lbl_d_deftgt.setText(t("defaults_target"))
+        self.cb_d_same.setText(t("allow_same_device"))
+        self.cb_d_dry.setText(t("opt_dryrun"))
+        self.cb_d_confirm.setText(t("confirm_erase"))
+        self.btn_start_decom.setText(t("start_decommission"))
+        # clone tab
+        self.lbl_c_tool.setText(t("clone_tool"))
+        self.btn_c_detect.setText(t("list_tools"))
+        self.lbl_c_src.setText(t("clone_source"))
+        self.lbl_c_tgt.setText(t("clone_target"))
+        self.cb_c_dry.setText(t("opt_dryrun"))
+        self.cb_c_confirm.setText(t("confirm_clone"))
+        self.btn_start_clone.setText(t("start_clone"))
+        if not self.status.text():
             self.status.setText(t("ready"))
 
     # -------------------------------------------------------------- runner
+    def _session_log_path(self):
+        import os
+        import sys
+        import time
+        import tempfile
+        # Prefer the directory the app runs from (portable: log lands next to the
+        # app/launcher); fall back to the home dir, then temp, if that's read-only.
+        candidates = []
+        try:
+            if getattr(sys, "frozen", False):
+                candidates.append(os.path.dirname(os.path.abspath(sys.executable)))
+            elif sys.argv and sys.argv[0]:
+                candidates.append(os.path.dirname(os.path.abspath(sys.argv[0])))
+        except Exception:
+            pass
+        candidates.append(os.environ.get("USERPROFILE") or os.path.expanduser("~"))
+        candidates.append(tempfile.gettempdir())
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        for base in candidates:
+            if not base:
+                continue
+            d = os.path.join(base, "backuptool-logs")
+            try:
+                os.makedirs(d, exist_ok=True)
+                test = os.path.join(d, ".wtest")
+                with open(test, "w"):
+                    pass
+                os.remove(test)
+                return os.path.join(d, "backuptool-gui-" + stamp + ".log")
+            except OSError:
+                continue
+        return os.path.join(tempfile.gettempdir(), "backuptool-gui-" + stamp + ".log")
+
+    def _close_logfh(self):
+        fh = getattr(self, "_logfh", None)
+        if fh:
+            try:
+                fh.close()
+            except OSError:
+                pass
+            self._logfh = None
+
     def _run(self, func, kwargs, label):
         if self._thread is not None and self._thread.isRunning():
             QMessageBox.information(self, label, self.tr_("busy"))
@@ -318,6 +649,18 @@ class MainWindow(QMainWindow):
         self.logbox.clear()
         self.progress.setValue(0)
         self.status.setText(f"{label} {self.tr_('running')}")
+
+        # Open a timestamped session log file and announce its path.
+        self._close_logfh()
+        try:
+            self._logpath = self._session_log_path()
+            self._logfh = open(self._logpath, "a", encoding="utf-8")
+            header = f"Log file: {self._logpath}"
+            self.logbox.appendPlainText(header)
+            self._logfh.write(header + "\n")
+            self._logfh.flush()
+        except OSError:
+            self._logfh = None
 
         self._thread = QThread()
         self._worker = Worker(func, kwargs, label)
@@ -334,6 +677,13 @@ class MainWindow(QMainWindow):
     @Slot(str)
     def _on_log(self, msg):
         self.logbox.appendPlainText(msg)
+        fh = getattr(self, "_logfh", None)
+        if fh:
+            try:
+                fh.write(msg + "\n")
+                fh.flush()
+            except OSError:
+                pass
 
     @Slot(int, int)
     def _on_progress(self, done, total):
@@ -344,10 +694,12 @@ class MainWindow(QMainWindow):
     @Slot(str)
     def _on_finished(self, label):
         self.status.setText(f"{label} {self.tr_('done_suffix')}")
+        self._close_logfh()
 
     @Slot(str)
     def _on_failed(self, err):
         self.status.setText(self.tr_("error"))
+        self._close_logfh()
         QMessageBox.critical(self, self.tr_("error"), err)
 
 
