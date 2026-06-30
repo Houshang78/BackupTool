@@ -23,6 +23,7 @@ class TestDbDump(unittest.TestCase):
         # An unknown engine (no default port/socket) must return False, not raise.
         self.assertFalse(dbdump.is_running("nope_db", {"port": 1}))
 
+    @unittest.skipUnless(os.name == "posix", "generic adapter runs a POSIX shell command")
     def test_generic_dump_runs(self):
         tmp = tempfile.mkdtemp()
         try:
@@ -32,6 +33,7 @@ class TestDbDump(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    @unittest.skipUnless(os.name == "posix", "generic adapter runs a POSIX shell command")
     def test_generic_dump_failure_is_reported(self):
         tmp = tempfile.mkdtemp()
         try:

@@ -318,21 +318,25 @@ mod tests {
 
     #[test]
     fn storage_type_detects_root() {
-        // On a real dev box the root volume resolves to a concrete kind (not unknown).
+        // Always returns a valid kind without panicking. Only require a *concrete*
+        // kind on macOS: Linux CI containers back "/" with overlayfs, which has no
+        // backing disk to classify, so "unknown" is legitimate there.
         let k = storage_type("/");
-        if cfg!(any(target_os = "macos", target_os = "linux")) {
+        if cfg!(target_os = "macos") {
             assert_ne!(k, StorageKind::Unknown);
         }
     }
 
     #[test]
     fn storage_info_names_partition() {
-        // The partition/device backing "/" should be identified on unix dev boxes.
+        // As above: only require a named partition device on macOS. On Linux CI
+        // (overlayfs root) there may be no backing device to report.
         let (dev, kind) = storage_info("/");
-        if cfg!(any(target_os = "macos", target_os = "linux")) {
+        if cfg!(target_os = "macos") {
             assert!(!dev.is_empty(), "expected a partition device for /");
             assert_ne!(kind, StorageKind::Unknown);
         }
+        let _ = (dev, kind);
     }
 
     #[test]

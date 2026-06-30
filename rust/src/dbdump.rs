@@ -237,6 +237,7 @@ pub fn dump_all<L: Fn(&str)>(specs: &[DbSpec], out_dir: &Path, conn: &DbConn, lo
 mod tests {
     use super::*;
 
+    #[cfg(unix)]  // the generic adapter runs a POSIX shell command (no sh/printf on Windows)
     #[test]
     fn generic_dump_writes_output() {
         let dir = std::env::temp_dir().join("bt-dbdump-test");
@@ -253,6 +254,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    #[cfg(unix)]  // POSIX shell command; on Windows there is no sh to run it
     #[test]
     fn generic_dump_failure_reported() {
         let dir = std::env::temp_dir().join("bt-dbdump-fail");
